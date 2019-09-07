@@ -1,0 +1,70 @@
+# Specify tetromino shapes.
+# To add new shapes or modify existing ones,
+# simply follow the existing syntax. Note that
+# shapes are bounded by a square box specified by size.
+# Do not put comments within a start/end block.
+# After specifying size=n, use 'row' to indicate
+# a row of the tetromino's data.
+
+# ***** L, teal *****
+start
+color=cyan
+size=4
+row ....
+row OOOO
+row ....
+row ....
+end
+
+# ***** J *****
+start
+color=blue
+size=3
+row O..
+row OOO
+row ...
+end
+
+# ***** L *****
+start
+color=orange
+size=3
+row ..O
+row OOO
+row ...
+end
+
+# ***** O *****
+start
+color=yellow
+size=2
+row OO
+row OO
+end
+
+# ***** S *****
+start
+color=green
+size=3
+row .OO
+row OO.
+row ...
+end
+
+# ***** T *****
+start
+color=purple
+size=3
+row .O.
+row OOO
+row ...
+end
+
+# ***** Z *****
+start
+color=red
+size=3
+row OO.
+row .OO
+row ...
+end
