@@ -1,6 +1,6 @@
 import sys
 import tkinter as tk
-from grid import Grid
+from game import Game
 from tetromino import TetrominoManager
 
 class Tetro(tk.Frame):
@@ -24,7 +24,7 @@ class Tetro(tk.Frame):
         self.tetromino_manager.load_tetrominoes('shapes.txt')
 
         self.tetris_instances = [
-            Grid(self.grid_width, self.grid_height, self.enable_lookaheads)]
+            Game(self.grid_width, self.grid_height, self.enable_lookaheads)]
         self.game_running = True
         self.game_loop()
 
@@ -32,8 +32,8 @@ class Tetro(tk.Frame):
     def load_gui(self):
         self.pack()
         self.tetris_canvas = tk.Canvas(self,
-            height=(self.cell_width*self.grid_height),
-            width=(self.cell_width*self.grid_width))
+            height=(self.cell_width * self.grid_height),
+            width=(self.cell_width * self.grid_width))
         self.tetris_canvas.pack(side="top")
 
         self.master.bind("<Key>", self.handle_key_event)

@@ -6,7 +6,7 @@
 # After specifying size=n, use 'row' to indicate
 # a row of the tetromino's data.
 
-# ***** L, teal *****
+# ***** L *****
 start
 color=cyan
 size=4

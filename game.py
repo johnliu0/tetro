@@ -2,10 +2,12 @@ import math
 from tetromino import TetrominoManager
 
 # an instance of the Tetris game
-class Grid:
+class Game:
     def __init__(self, grid_width, grid_height, enable_lookaheads):
         self.grid_width = grid_width
         self.grid_height = grid_height
+        # whether or not the game has been lost
+        self.lost = False
         self.enable_lookaheads = enable_lookaheads
 
         # the Tetris grid begins at the top-left corner
@@ -19,19 +21,17 @@ class Grid:
 
         self.current_tetromino = self.tetromino_manager.new_tetromino()
 
-    # updates the game logic once
-    # this forces the Tetromino to fall down one block
-    # if the tetromino was already touching the ground
+    # updates the game logic once; this forces the Tetromino to fall one block
+    # if the tetromino is touching the ground
     # then it is placed and a new tetromino is generated
     def update(self):
-        # attempt to let tetromino fall downwards one block
-        self.current_tetromino.move(y=1)
-        # if it is colliding with something, then place it down
-        if self.is_colliding(self.current_tetromino):
-            self.current_tetromino.move(y=-1)
-            self.place_tetromino()
-
-        pass
+        if not self.lost:
+            # attempt to let tetromino fall downwards one block
+            self.current_tetromino.move(y=1)
+            # if it is colliding with something, then place it down
+            if self.is_colliding(self.current_tetromino):
+                self.current_tetromino.move(y=-1)
+                self.place_tetromino()
 
     def render(self, canvas, cell_width):
         # draw background
@@ -49,16 +49,17 @@ class Grid:
                         fill=self.tetromino_manager.get_tetromino_color(self.grid[x][y]))
 
         # draw current tetromino
-        block_data = self.current_tetromino.get_block_data()
-        pos_x = self.current_tetromino.get_pos_x()
-        pos_y = self.current_tetromino.get_pos_y()
-        for x in range(len(block_data)):
-            for y in range(len(block_data[0])):
-                if block_data[x][y]:
-                    canvas.create_rectangle(
-                        (x + pos_x) * cell_width, (y + pos_y) * cell_width,
-                        (x + pos_x + 1) * cell_width, (y + pos_y + 1) * cell_width,
-                        fill=self.current_tetromino.get_color())
+        if not self.lost:
+            block_data = self.current_tetromino.get_block_data()
+            pos_x = self.current_tetromino.get_pos_x()
+            pos_y = self.current_tetromino.get_pos_y()
+            for x in range(len(block_data)):
+                for y in range(len(block_data[0])):
+                    if block_data[x][y]:
+                        canvas.create_rectangle(
+                            (x + pos_x) * cell_width, (y + pos_y) * cell_width,
+                            (x + pos_x + 1) * cell_width, (y + pos_y + 1) * cell_width,
+                            fill=self.current_tetromino.get_color())
 
     # places the tetromino where it is and generate a new one
     def place_tetromino(self):
@@ -69,7 +70,12 @@ class Grid:
         for x in range(size):
             for y in range(size):
                 if block_data[x][y]:
-                    self.grid[x + pos_x][y + pos_y] = self.current_tetromino.get_id()
+                    # skip if the cell is out of bounds
+                    grid_x = x + pos_x
+                    grid_y = y + pos_y
+                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                        continue
+                    self.grid[grid_x][grid_y] = self.current_tetromino.get_id()
 
         # check for cleared lines
         # start from lowest possible line and go up
@@ -90,9 +96,22 @@ class Grid:
                 # otherwise go to next line
                 current_y -= 1
 
+        # generate a new tetromino
         self.current_tetromino = self.tetromino_manager.new_tetromino()
 
-    # drops the tetromino immediately downwards and places it
+        # determine if it is colliding with anything
+        if self.is_colliding(self.current_tetromino):
+            # move it upwards to try and free it
+            while self.is_colliding(self.current_tetromino):
+                self.current_tetromino.move(y=-1)
+                # check if it has moved out of bounds
+                if self.is_colliding(self.current_tetromino, include_grid=False):
+                    self.current_tetromino = None
+                    self.lost = True
+                    break
+
+
+    # drops the tetromino immediately downwards as far as it can and places it
     def drop_tetromino(self):
         self.current_tetromino.move(y=1)
         while not self.is_colliding(self.current_tetromino):
@@ -165,7 +184,9 @@ class Grid:
     # returns whether or not a tetromino is colliding with the grid
     # it is colliding if it is out of bounds or if it is intersecting
     # with any already placed tetrominoes
-    def is_colliding(self, tetromino):
+    # include_grid may also be passed as false to check only if
+    # the tetromino is out of bounds
+    def is_colliding(self, tetromino, include_grid=True):
         block_data = self.current_tetromino.get_block_data()
         pos_x = self.current_tetromino.get_pos_x()
         pos_y = self.current_tetromino.get_pos_y()
@@ -175,11 +196,12 @@ class Grid:
                     # transform tetromino coordinates to grid coordinates
                     grid_x = x + pos_x
                     grid_y = y + pos_y
+
                     # check if out of bounds
                     if (grid_x < 0 or grid_y < 0
                         or grid_x >= self.grid_width or grid_y >= self.grid_height):
                         return True
+
                     # check if intersecting with placed tetrominoes
-                    if self.grid[grid_x][grid_y] != 0:
+                    if include_grid and self.grid[grid_x][grid_y] != 0:
                         return True
-        return False
