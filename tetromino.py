@@ -13,6 +13,7 @@ class Tetromino:
 
     # returns the id of this tetromino
     # tetrominos of the same kind (block_data, color, etc.) share the same id
+    # ids begin at 1
     def get_id(self):
         return self.id
 
@@ -52,8 +53,6 @@ class Tetromino:
                     self.block_data[self.size - y - 1][x])
             new_block_data.append(col)
         self.block_data = new_block_data
-
-
 
     # moves this tetromino by a specified amount
     def move(self, x=0, y=0):
@@ -136,3 +135,7 @@ class TetrominoManager:
     # returns the color of the tetromino with a given id
     def get_tetromino_color(self, id):
         return self.tetromino_list[id - 1]["color"]
+
+    # gets the number of type of tetrmoinoes
+    def get_num_type_tetrominoes(self):
+        return len(self.tetromino_list)

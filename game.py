@@ -9,6 +9,7 @@ class Game:
         # whether or not the game has been lost
         self.lost = False
         self.enable_lookaheads = enable_lookaheads
+        self.score = 0
 
         # the Tetris grid begins at the top-left corner
         # and can be indexed by grid[x][y]
@@ -18,7 +19,6 @@ class Game:
             self.grid.append(col)
 
         self.tetromino_manager = TetrominoManager.get_instance()
-
         self.current_tetromino = self.tetromino_manager.new_tetromino()
 
     # updates the game logic once; this forces the Tetromino to fall one block
@@ -32,6 +32,7 @@ class Game:
             if self.is_colliding(self.current_tetromino):
                 self.current_tetromino.move(y=-1)
                 self.place_tetromino()
+                return
 
     def render(self, canvas, cell_width):
         # draw background
@@ -89,6 +90,7 @@ class Game:
 
             # move everything above line down one block if cleared
             if line_cleared:
+                self.score += 1
                 for y in range(current_y, 0, -1):
                     for x in range(self.grid_width):
                         self.grid[x][y] = self.grid[x][y - 1]
@@ -97,7 +99,7 @@ class Game:
                 current_y -= 1
 
         # generate a new tetromino
-        self.current_tetromino = self.tetromino_manager.new_tetromino()
+        self.current_tetromino = self.tetromino_manager.new_tetromino(startx=self.grid_width // 2 - 1)
 
         # determine if it is colliding with anything
         if self.is_colliding(self.current_tetromino):
@@ -139,7 +141,7 @@ class Game:
             self.place_tetromino()
 
     # attempts to rotate current tetromino 90 degrees clockwise
-    def rotate(self):
+    def rotate_tetromino(self):
         # a rotation in place is attempted first
         self.current_tetromino.rotate()
         # if it is colliding, then move the tetromino left or right
