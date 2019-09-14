@@ -90,6 +90,7 @@ class Game:
 
             # move everything above line down one block if cleared
             if line_cleared:
+                print("CLEARED")
                 self.score += 1
                 for y in range(current_y, 0, -1):
                     for x in range(self.grid_width):
