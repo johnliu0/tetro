@@ -30,7 +30,7 @@ class Tetro(tk.Frame):
         self.neural_networks = []
         # index of the tetris game that is currently being rendered to screen
         self.current_spectating_idx = 0
-        self.generate_games(15)
+        self.generate_games(1)
 
         self.game_running = True
         self.start_game_loop()
@@ -86,7 +86,7 @@ class Tetro(tk.Frame):
         self.render()
 
         if self.game_running:
-            self.after(100, self.game_loop)
+            self.after(25, self.game_loop)
 
     # updates all Tetris instances once
     # i.e. make all blocks fall down one block

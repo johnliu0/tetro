@@ -11,7 +11,7 @@ class NeuralNetwork:
     # from 0 to 1 of how good the move is; the highest will be taken
     # hidden_layers describes how many
     def __init__(self, num_type_tetrominoes, grid_width, grid_height,
-        min_pos_x, min_pos_y, max_pos_x, max_pos_y, hidden_layers=[64, 64, 64]):
+        min_pos_x, min_pos_y, max_pos_x, max_pos_y, hidden_layers=[128, 128, 128]):
         self.num_type_t = num_type_tetrominoes
         self.grid_width = grid_width
         self.grid_height = grid_height
@@ -42,7 +42,7 @@ class NeuralNetwork:
         for i in range(input_size):
             self.weights[0].append([])
             for j in range(hidden_layers[0] if len(hidden_layers) > 0 else self.output_layer_size):
-                self.weights[0][i].append(random())
+                self.weights[0][i].append(random() * 2 - 1)
 
         # hidden layers
         for i in range(len(hidden_layers) - 1):
@@ -50,7 +50,7 @@ class NeuralNetwork:
             for j in range(hidden_layers[i]):
                 self.weights[i + 1].append([])
                 for k in range(hidden_layers[i + 1]):
-                    self.weights[i + 1][j].append(random())
+                    self.weights[i + 1][j].append(random() * 2 - 1)
 
         # output layers
         self.weights.append([])
@@ -58,7 +58,7 @@ class NeuralNetwork:
             for i in range(hidden_layers[-1]):
                 self.weights[-1].append([])
                 for j in range(self.layer_sizes[-1]):
-                    self.weights[-1][i].append(random())
+                    self.weights[-1][i].append(random() * 2 - 1)
 
     # returns a list of size 5 containing scores of the four moves:
     # go left, go right, go down, drop, rotate
@@ -80,19 +80,29 @@ class NeuralNetwork:
             # type of tetromino
             weighted_avg += (self.weights[0][self.grid_width * self.grid_height + 2][i]
                 * self.lin_norm(tetromino_x, 1, self.num_type_t))
-            layer_output.append(weighted_avg)
+            layer_output.append(self.relu(weighted_avg))
+        #print(layer_output)
 
-        # iterate through rest of the layers
-        for i in range(len(self.layer_sizes) - 2):
+        # iterate through the rest of the hidden layers
+        for i in range(len(self.layer_sizes) - 3):
             next_output = []
             for j in range(self.layer_sizes[i + 2]):
                 weighted_avg = 0
                 for k in range(len(layer_output)):
-                    weighted_avg += (self.weights[i + 1][k][j] * layer_output[k])
-                next_output.append(weighted_avg)
+                    weighted_avg += self.weights[i + 1][k][j] * layer_output[k]
+                next_output.append(self.relu(weighted_avg))
             layer_output = next_output
+            print(layer_output)
 
-        return layer_output
+        final_output = []
+        for j in range(self.layer_sizes[-1]):
+            weighted_avg = 0
+            for k in range(len(layer_output)):
+                weighted_avg += self.weights[-1][k][j] * layer_output[k]
+            final_output.append(weighted_avg)
+
+        print(final_output)
+        return final_output
 
     # rectified linear function
     def relu(self, x):
