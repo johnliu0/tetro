@@ -1,48 +1,42 @@
 import sys
 import time
 import tkinter as tk
+from copy import deepcopy
 from random import randint
 from game import Game
 from neuralnetwork import (NeuralNetwork,
     generate_neural_network,
     compute_fitness, crossover, mutate)
-from tetromino import TetrominoManager
+from tetromino import TetrominoManager, Tetromino
 
 class Tetro(tk.Frame):
     def __init__(self, master = None):
         super().__init__(master)
         self.master = master
-
-        # Tetris grid dimensions
-        self.grid_width = None
-        self.grid_height = None
-        self.population_size = None
-        self.num_parents = None
-        self.mutate_rate = None
-        # lookahead Tetromino
-        self.enable_lookaheads = None
-        # width of one cell in pixels
+        # basic Tetris and genetic algorithm properties
+        self.grid_width = 0
+        self.grid_height = 0
+        self.population_size = 0
+        self.num_parents = 0
+        self.mutate_rate = 0
         self.cell_width = 35
-
+        # active Tetris games and neural networks
         self.tetris_instances = []
         self.neural_networks = []
         # index of the tetris game that is currently being rendered to screen
         self.current_spectating_idx = 0
         self.generations = 0
-
+        # load properties from file and init gui
         self.load_props()
         self.pack()
         self.load_gui()
 
-        self.tetromino_manager = TetrominoManager.get_instance()
-        self.tetromino_manager.load_tetrominoes('shapes.txt')
-        self.generate_games(self.population_size)
-
+        self.tmino_manager = TetrominoManager.get_instance()
+        self.tmino_manager.load_tetrominoes('shapes.txt', self.grid_width, self.grid_height)
+        self.before_time = 0
         self.game_running = True
-        self.update_gui_title()
-        self.start_game_loop()
-
-        print('STARTING GENERATION: 0')
+        self.generate_games(self.population_size)
+        self.game_loop()
 
     # initializes tkinter window
     def load_gui(self):
@@ -59,18 +53,15 @@ class Tetro(tk.Frame):
         with open('properties.txt', 'r') as f:
             for line in f:
                 line = line.strip()
-
                 # ignore blank lines and comments
                 if len(line) == 0 or line[0] == '#':
                     continue
-
                 # parse key=value
                 idx_equals = line.find('=')
                 if idx_equals == -1:
                     print(f"Line corrupt: {line}")
                 key = line[:idx_equals]
                 value = line[idx_equals + 1:]
-
                 if key == 'grid_width':
                     self.grid_width = int(value)
                 elif key == 'grid_height':
@@ -81,14 +72,6 @@ class Tetro(tk.Frame):
                     self.num_parents = int(value)
                 elif key == 'mutate_rate':
                     self.mutate_rate = float(value)
-                elif key == 'enable_lookaheads':
-                    self.enable_lookaheads = value == 'True'
-
-    def start_game_loop(self):
-        # initialize time variables
-        self.before_time = time.perf_counter()
-        current_time = 0
-        self.game_loop()
 
     # main game loop
     def game_loop(self):
@@ -96,67 +79,115 @@ class Tetro(tk.Frame):
         delta_time = self.current_time - self.before_time
         self.before_time = self.current_time
 
-        self.update_game()
-        self.update_ai()
-        self.render()
+        self.update()
         self.update_gui_title()
+        self.render()
 
         if self.game_running:
-            self.after(1, self.game_loop)
+            self.after(10, self.game_loop)
 
-    # updates all Tetris instances once
-    # i.e. make all blocks fall down one block
-    def update_game(self):
-        for i, inst in enumerate(self.tetris_instances):
-            inst.update()
-
-    # activates all neural networks once
-    def update_ai(self):
+    def update(self):
         all_lost = True
+        # compute all possible tetromino placements for each Tetris instance
+        # and choose the move that best optimizes the Tetris score
         for inst, network in zip(self.tetris_instances, self.neural_networks):
+            # first update the Tetris instance
+            inst.update()
             if inst.lost:
                 continue
             all_lost = False
-            # prepare input data for network
-            # -1: occupied, 0: empty, 1: occupied by current tetromino
-            tetromino = inst.current_tetromino
-            grid = [[(0 if elem == 0 else -1) for elem in col] for col in inst.grid]
-            pos_x = inst.current_tetromino.get_pos_x()
-            pos_y = inst.current_tetromino.get_pos_y()
-            block_data = inst.current_tetromino.get_block_data()
-            for x in range(len(block_data)):
-                for y in range(len(block_data[0])):
-                    if block_data[x][y]:
-                        # transform tetromino coordinates to grid coordinates
-                        grid[x + pos_x][y + pos_y] = 1
+            tmino_id = inst.current_tmino.data.id
 
-            network_output = network.activate(grid)
+            # convert grid to a binary representation
+            # where True is an occupied cell and False is an empty cell
+            grid = []
+            for x in range(self.grid_width):
+                grid.append([])
+                for y in range(self.grid_height):
+                    grid[-1].append(inst.grid[x][y] != 0)
 
-            idx_max = 0
-            for i in range(len(network_output)):
-                if network_output[i] > network_output[idx_max]:
-                    idx_max = i
-            if idx_max == 0:
-                # go left
-                inst.move_left()
-            elif idx_max == 1:
-                # go right
-                inst.move_right()
-            elif idx_max == 2:
-                # drop
-                inst.drop_tetromino()
-            else:
-                # rotate
-                inst.rotate_tetromino()
+            # keep track of the best move that can be made
+            # a list in the format: (score, x_pos, y_pos, None)
+            best_move = [float('-inf'), 0, 0, None]
+            # try each rotation
+            for rotation in range(4):
+                # initialize the rotated tetromino
+                tmino = Tetromino(self.tmino_manager.get_tetromino_type(tmino_id, rotation))
+                # try each possible column
+                for x in range(tmino.data.min_x, tmino.data.max_x + 1):
+                    tmino.x_pos = x
+                    # find the lowest point that it can drop to
+                    for y in range(tmino.data.min_y, tmino.data.max_y + 2):
+                        tmino.y_pos = y
+                        # if the tetromino is colliding, then the previous move
+                        # is the furthest it could have dropped
+                        if inst.is_colliding(tmino):
+                            # however if the tetromino was colliding even at
+                            # its min y position, then it is not possible
+                            # to make a move in this column
+                            if tmino.y_pos == tmino.data.min_y:
+                                break
+                            tmino.y_pos -= 1
 
+                            # add the tetromino to the binary grid
+                            for x2 in range(tmino.data.size):
+                                for y2 in range(tmino.data.size):
+                                    if tmino.data.block_data[x2][y2]:
+                                        grid_x = x2 + tmino.x_pos
+                                        grid_y = y2 + tmino.y_pos
+                                        # check if the tetromino cell is out of bounds
+                                        if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                                            continue
+                                        # otherwise update the grid cell with the tetromino cell
+                                        grid[grid_x][grid_y] = True
+
+                            # compute a score for this move using the neural network
+                            score = network.activate(grid)
+                            if score > best_move[0]:
+                                best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
+
+                            # remove this tetromino from the binary grid
+                            for x2 in range(tmino.data.size):
+                                for y2 in range(tmino.data.size):
+                                    if tmino.data.block_data[x2][y2]:
+                                        grid_x = x2 + tmino.x_pos
+                                        grid_y = y2 + tmino.y_pos
+                                        # check if the tetromino cell is out of bounds
+                                        if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                                            continue
+                                        # otherwise
+                                        grid[grid_x][grid_y] = False
+                            # once we have found a collision, move on to the next column
+                            break
+            inst.current_tmino = Tetromino(best_move[3], best_move[1], best_move[2])
         if all_lost:
-            self.next_generation()
+            print((' ').join([str(compute_fitness(inst)) for inst in self.tetris_instances]))
 
+    def render(self):
+        self.tetris_canvas.delete("all")
+        # render one Tetris game to screen
+        self.tetris_instances[self.current_spectating_idx].render(
+            self.tetris_canvas, self.cell_width)
+
+    def generate_games(self, num=1):
+        self.tetris_instances.clear()
+        self.neural_networks.clear()
+        for i in range(num):
+            self.tetris_instances.append(Game(self.grid_width, self.grid_height))
+            self.neural_networks.append(generate_neural_network(self.grid_width, self.grid_height))
+
+    def update_gui_title(self):
+        self.master.title(
+                f'Tetro | Gen: {self.generations} ' +
+                f'Viewing: {self.current_spectating_idx + 1}/{self.population_size} ' +
+                ('(LOST)' if self.tetris_instances[self.current_spectating_idx].lost else '(ALIVE)'))
+
+    """
     def render(self):
         self.tetris_canvas.delete("all")
         self.tetris_instances[self.current_spectating_idx].render(self.tetris_canvas, self.cell_width)
 
-    # generates some tetris instances and neural networks
+   # generates some tetris instances and neural networks
     def generate_games(self, num):
         self.tetris_instances.clear()
         self.neural_networks.clear()
@@ -201,40 +232,31 @@ class Tetro(tk.Frame):
                 f'Tetro | Gen: {self.generations} ' +
                 f'Viewing: {self.current_spectating_idx + 1}/{self.population_size} ' +
                 ('(LOST)' if self.tetris_instances[self.current_spectating_idx].lost else '(ALIVE)'))
-
+    """
     # handle keyboard input
     def handle_key_event(self, event):
         # switch between Tetris instances
         if event.char == 'j': # view previous neural network
             self.current_spectating_idx -= 1
             self.current_spectating_idx %= len(self.tetris_instances)
-            self.render()
         elif event.char == 'k': # view next neural network
             self.current_spectating_idx += 1
             self.current_spectating_idx %= len(self.tetris_instances)
-            self.render()
         elif event.char == 'n': # generate new Tetris games
-            self.generate_games(self.population_size)
-            self.render()
-        self.update_gui_title()
-
-        """if event.char == 'a':
-            self.tetris_instances[0].move_left()
-            self.render()
+            #self.generate_games(self.population_size)
+            pass
+        elif event.char == 'a':
+            self.tetris_instances[self.current_spectating_idx].move_left()
         elif event.char == 'd':
-            self.tetris_instances[0].move_right()
-            self.render()
+            self.tetris_instances[self.current_spectating_idx].move_right()
         elif event.char == 's':
-            self.tetris_instances[0].move_down()
-            self.render()
+            self.tetris_instances[self.current_spectating_idx].move_down()
         elif event.char == 'w':
-            self.tetris_instances[0].rotate_tetromino()
-            self.render()
+            self.tetris_instances[self.current_spectating_idx].rotate()
         elif event.char == ' ':
-            self.tetris_instances[0].drop_tetromino()
-            self.render()"""
-
-print(sys.argv[0])
+            self.tetris_instances[self.current_spectating_idx].drop()
+        self.update_gui_title()
+        self.render()
 
 if __name__ == "__main__":
     root = tk.Tk()

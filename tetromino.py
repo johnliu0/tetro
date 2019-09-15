@@ -1,39 +1,108 @@
 import re as regexp
-import copy
+from copy import deepcopy
 from random import randint
 
-class Tetromino:
-    def __init__(self, id, size, block_data, color, startx, starty):
-        self.id = id
-        self.size = size
-        self.block_data = copy.deepcopy(block_data)
-        self.color = color
-        self.pos_x = startx
-        self.pos_y = starty
+# Functionality for handling tetrominoes
+class TetrominoManager:
+    singleton = None
+    def get_instance():
+        if TetrominoManager.singleton == None:
+            TetrominoManager.singleton = TetrominoManager()
+        return TetrominoManager.singleton
 
-    # returns the id of this tetromino
-    # tetrominos of the same kind (block_data, color, etc.) share the same id
-    # ids begin at 1
-    def get_id(self):
-        return self.id
+    def __init__(self):
+        if TetrominoManager.singleton != None:
+            raise Exception('Access TetrominoManager using get_instance().')
+        self.tmino_list = []
+        self.unique_types = 0
 
-    def get_size(self):
-        return self.size
+    def random_tetromino(self):
+        idx = randint(0, self.unique_types - 1)
+        # randomly choose a tetromino with no rotation
+        tmino_type = self.tmino_list[idx * 4]
+        # place it in the top middle of the grid
+        return Tetromino(tmino_type,
+            (tmino_type.max_x - tmino_type.min_x) // 2 + tmino_type.min_x, tmino_type.min_y)
 
-    def get_block_data(self):
-        return self.block_data
+    def get_tetromino_color(self, id):
+        return self.tmino_list[(id - 1) * 4].color
 
-    def get_color(self):
-        return self.color
+    # loads tetromino data from the shapes file
+    def load_tetrominoes(self, file_path, grid_width, grid_height):
+        global unique_types
+        with open(file_path, 'r') as f:
+            color = ''
+            block_data = []
+            for line in f:
+                line = line.strip()
+                # ignore blank lines and comments
+                if len(line) == 0 or line[0] == '#':
+                    continue
+                # start of new tetromino, reset all variables
+                if line == 'start':
+                    self.unique_types += 1
+                    block_data = []
+                elif line == 'end':
+                    # after finishing reading data about tetromino; process it
+                    # use unique_types as an id (acts like a counter)
+                    self.process_tetromino(block_data, grid_width, grid_height, self.unique_types, color)
+                elif line.startswith('row'):
+                    # read row of tetromino block data
+                    row_data = regexp.split('(\s+)', line)[2]
+                    for i in range(len(row_data)):
+                        # initialize block_data if this is the first row specified
+                        if len(block_data) == 0:
+                            for j in range(len(row_data)):
+                                block_data.append([])
+                        block_data[i].append(row_data[i] == 'O')
+                else:
+                    # parse key=value
+                    idx_equals = line.find('=')
+                    if idx_equals == -1:
+                        print(f'Line corrupt: {line}')
+                    key = line[:idx_equals]
+                    value = line[idx_equals + 1:]
+                    if key == 'color':
+                        color = value
 
-    def get_pos_x(self):
-        return self.pos_x
+    # given tetromino block data; compute information
+    # about rotation and position and add to tetromino_types
+    def process_tetromino(self, block_data, grid_width, grid_height, id, color):
+        # go through each rotation
+        tmino_width = len(block_data)
+        tmino_height = len(block_data)
+        for i in range(4):
+            if i != 0:
+                block_data = self.rotate(block_data)
+            # find min/max x/y
+            min_x, min_y, max_x, max_y = 0, 0, 0, 0
+            while not self.out_of_bounds(block_data, min_x - 1, 0, grid_width, grid_height):
+                min_x -= 1
+            while not self.out_of_bounds(block_data, 0, min_y - 1, grid_width, grid_height):
+                min_y -= 1
+            while not self.out_of_bounds(block_data, max_x + 1, 0, grid_width, grid_height):
+                max_x += 1
+            while not self.out_of_bounds(block_data, 0, max_y + 1, grid_width, grid_height):
+                max_y += 1
+            self.tmino_list.append(TetrominoType(id, block_data, len(block_data), min_x, min_y, max_x, max_y, i, color))
 
-    def get_pos_y(self):
-        return self.pos_y
+    # check if a tetromino is out of bounds at the given coordinates
+    def out_of_bounds(self, block_data, x_pos, y_pos, grid_width, grid_height):
+        for x in range(len(block_data)):
+            for y in range(len(block_data)):
+                if block_data[x][y]:
+                    # convert local tetromino coordinates to grid coordinates
+                    grid_x = x + x_pos
+                    grid_y = y + y_pos
+                    # check if out of bounds
+                    if (grid_x < 0 or grid_y < 0
+                        or grid_x >= grid_width
+                        or grid_y >= grid_height):
+                        return True
+        return False
 
     # performs a 90 degree rotation
-    def rotate(self, clockwise=True):
+    def rotate(self, block_data):
         # we treat the indices of block_data as points in a cartesian space
         # we can then translate the points such that the center of the
         # points which are arranged in a square is the origin of the space
@@ -44,98 +113,39 @@ class Tetromino:
         # matrix y-axis points downwards
         # after simplifying the math, the solution turns out to be quite nice
         new_block_data = []
-        for x in range(self.size):
-            col = []
-            for y in range(self.size):
-                col.append(
-                    self.block_data[y][self.size - x - 1]
-                    if clockwise else
-                    self.block_data[self.size - y - 1][x])
-            new_block_data.append(col)
-        self.block_data = new_block_data
+        for x in range(len(block_data)):
+            new_block_data.append([block_data[y][len(block_data) - x - 1] for y in range(len(block_data))])
+        return new_block_data
 
-    # moves this tetromino by a specified amount
-    def move(self, x=0, y=0):
-        self.pos_x += x
-        self.pos_y += y
+    # prints block data to the console neatly
+    def print_block_data(self, block_data):
+        for y in range(len(block_data)):
+            print(''.join(['@' if block_data[x][y] else '.' for x in range(len(block_data))]))
 
-# handles generation of new tetrominoes
-class TetrominoManager:
-    singleton = None
-    def get_instance():
-        if TetrominoManager.singleton == None:
-            TetrominoManager.singleton = TetrominoManager()
-        return TetrominoManager.singleton
+    def get_tetromino_type(self, id, rotation=0):
+        return TetrominoManager.get_instance().tmino_list[((id - 1) * 4) + rotation % 4]
 
-    def __init__(self):
-        if TetrominoManager.singleton != None:
-            raise Exception("Access TetrominoManager using get_instance()")
+# information a tetromino
+# provides details about rotation and min/max x/y positions
+class TetrominoType:
+    def __init__(self, id, block_data, size, min_x, min_y, max_x, max_y, rotation, color):
+        self.id = id
+        self.block_data = deepcopy(block_data)
+        self.size = size
+        self.min_x = min_x
+        self.min_y = min_y
+        self.max_x = max_x
+        self.max_y = max_y
+        self.rotation = rotation
+        self.color = color
 
-        self.tetromino_list = []
+# an instance of a tetromino
+class Tetromino:
+    def __init__(self, tetromino_type, x_pos=0, y_pos=0):
+        self.data = tetromino_type
+        self.x_pos = x_pos
+        self.y_pos = y_pos
 
-    # loads tetromino data from the shapes file
-    def load_tetrominoes(self, file_path):
-        with open(file_path, 'r') as f:
-            current_tetromino = None
-            # each tetromino gets a unique id (index of tetromino data in tetromino_list)
-            # ids begin at 1 since the Tetris grid will use 0 as an empty space
-            unique_id = 1
-
-            for line in f:
-                line = line.strip()
-
-                # ignore blank lines and comments
-                if len(line) == 0 or line[0] == '#':
-                    continue
-
-                # generate a new tetromino template
-                if line == "start":
-                    current_tetromino = {
-                        "unique_id": unique_id,
-                        "block_data": []
-                    }
-                    unique_id += 1
-                elif line == "end":
-                    # end the current tetromino template
-                    self.tetromino_list.append(current_tetromino)
-                elif line.startswith('row'):
-                    # read tetromino block data
-                    row_data = regexp.split("(\s+)", line)[2]
-                    for i in range(current_tetromino["size"]):
-                        current_tetromino["block_data"][i].append(row_data[i] == "O")
-                else:
-                    # parse key=value
-                    idx_equals = line.find('=')
-                    if idx_equals == -1:
-                        print(f"Line corrupt: {line}")
-                    key = line[:idx_equals]
-                    value = line[idx_equals + 1:]
-
-                    if key == "color":
-                        current_tetromino["color"] = value
-                    elif key == "size":
-                        # initialize tetromino data
-                        current_tetromino["size"] = int(value)
-                        for i in range(int(value)):
-                            current_tetromino["block_data"].append([])
-
-    # generates a randomly selected tetromino
-    def new_tetromino(self, startx=0, starty=0) -> Tetromino:
-        # randomly select a tetromino dataset
-        idx = randint(0, len(self.tetromino_list) - 1)
-        return Tetromino(
-            self.tetromino_list[idx]["unique_id"],
-            self.tetromino_list[idx]["size"],
-            self.tetromino_list[idx]["block_data"],
-            self.tetromino_list[idx]["color"],
-            startx,
-            starty
-        )
-
-    # returns the color of the tetromino with a given id
-    def get_tetromino_color(self, id):
-        return self.tetromino_list[id - 1]["color"]
-
-    # gets the number of type of tetrmoinoes
-    def get_num_type_tetrominoes(self):
-        return len(self.tetromino_list)
+    def rotate(self):
+        self.data = TetrominoManager.get_instance().get_tetromino_type(
+            self.data.id, self.data.rotation + 1)

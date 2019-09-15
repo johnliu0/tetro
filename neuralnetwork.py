@@ -33,17 +33,16 @@ class NeuralNetwork:
                 next_output.append(relu(weighted_avg + self.biases[i + 1][j]))
             layer_output = next_output
         # finally produce an output
-        final_output = []
+        final_output = 0
         for i in range(self.layer_sizes[-1]):
-            weighted_avg = 0
             for j in range(len(layer_output)):
-                weighted_avg += self.weights[-1][j][i] * layer_output[j]
-            final_output.append(weighted_avg + self.biases[-1][i])
+                final_output += self.weights[-1][j][i] * layer_output[j]
+
         return final_output
 
-def generate_neural_network(grid_width, grid_height, hidden_layers=[25, 25]):
+def generate_neural_network(grid_width, grid_height, hidden_layers=[5]):
     layer_sizes = []
-    output_layer_size = 4
+    output_layer_size = 1
     # initalize weights in range [-1, 1]
     # weights array is three-dimensional
     # weights[i][j][k] represents the weight from the jth node of the ith layer
@@ -106,7 +105,7 @@ def compute_fitness(tetris_inst):
             if tetris_inst.grid[x][y] != 0:
                 cells_filled += 1
         score += score_factor * cells_filled * cells_filled
-    return tetris_inst.score + score
+    return tetris_inst.lines_cleared + score
 
 # combines two neural networks by mixing their weights and biases
 def crossover(network1, network2):
