@@ -100,7 +100,7 @@ class Game:
         if colliding:
             max_translation = self.current_tmino.data.size // 2
             for i in range(max_translation):
-                self.current_tmino.pos_x -= 1
+                self.current_tmino.x_pos -= 1
                 if not self.is_colliding(self.current_tmino):
                     colliding = False
                     break
@@ -118,7 +118,7 @@ class Game:
         if colliding:
             self.current_tmino.x_pos = original_x
             # revert rotation
-            self.current_tmino.rotate()
+            self.current_tmino.rotate(False)
 
     # drops the tetromino immediately downwards as far as possible and places it
     def drop(self):
@@ -147,6 +147,7 @@ class Game:
 
     # places the current tetromino down and generates a new one
     def place_tetromino(self):
+        # transfer the tetromino data to the grid data
         for x in range(self.current_tmino.data.size):
             for y in range(self.current_tmino.data.size):
                 if self.current_tmino.data.block_data[x][y]:
@@ -159,14 +160,18 @@ class Game:
 
         # check for cleared lines
         # start from lowest possible line and go up
-        current_y = self.grid_height - 1
-        while current_y >= 0:
+        current_y = self.current_tmino.y_pos + self.current_tmino.data.size - 1
+        for i in range(self.current_tmino.data.size):
+            # check if this line is out of bounds
+            if current_y >= self.grid_height:
+                current_y -= 1
+                continue
+            # check for line clear
             line_cleared = True
             for x in range(self.grid_width):
                 if self.grid[x][current_y] == 0:
                     line_cleared = False
                     break
-
             # move everything above line down one block if cleared
             if line_cleared:
                 self.lines_cleared += 1

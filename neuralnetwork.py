@@ -19,10 +19,8 @@ class NeuralNetwork:
             weighted_avg = 0
             for x in range(len(grid)):
                 for y in range(len(grid[0])):
-                    weighted_avg += (self.weights[0][x * len(grid[0]) + y]
-                    [i] *
-                    grid[x][y])
-            layer_output.append(relu(weighted_avg + self.biases[0][i]))
+                    weighted_avg += (self.weights[0][x * len(grid[0]) + y][i] * grid[x][y])
+            layer_output.append(relu(weighted_avg / (len(grid) * len(grid[0])) + self.biases[0][i]))
         # iterate through the rest of the hidden layers
         for i in range(len(self.layer_sizes) - 3):
             next_output = []
@@ -30,17 +28,17 @@ class NeuralNetwork:
                 weighted_avg = 0
                 for k in range(len(layer_output)):
                     weighted_avg += self.weights[i + 1][k][j] * layer_output[k]
-                next_output.append(relu(weighted_avg + self.biases[i + 1][j]))
+                next_output.append(relu(weighted_avg / len(layer_output) + self.biases[i + 1][j]))
             layer_output = next_output
         # finally produce an output
         final_output = 0
         for i in range(self.layer_sizes[-1]):
             for j in range(len(layer_output)):
                 final_output += self.weights[-1][j][i] * layer_output[j]
+        final_output /= len(layer_output)
+        return sigmoid(final_output)
 
-        return final_output
-
-def generate_neural_network(grid_width, grid_height, hidden_layers=[5]):
+def generate_neural_network(grid_width, grid_height, hidden_layers=[10]):
     layer_sizes = []
     output_layer_size = 1
     # initalize weights in range [-1, 1]
@@ -91,21 +89,71 @@ def generate_neural_network(grid_width, grid_height, hidden_layers=[5]):
     return NeuralNetwork(weights, biases, layer_sizes)
 
 
-def compute_fitness(tetris_inst):
+def compute_fitness(grid):
     # fitness is based on lines cleared and
     # number of cells filled on grid
     # the more cells are filled per row, the higher the score
     # lines cleared are worth exactly 1 point
-    grid_width = tetris_inst.grid_width
+    grid_width = len(grid)
+    grid_height = len(grid[0])
     score = 0
-    score_factor = 1 / (grid_width * grid_width)
-    for y in range(tetris_inst.grid_height):
+    exp = 3
+    score_factor = 1 / math.pow(grid_width, exp)
+    for y in range(grid_height):
         cells_filled = 0
         for x in range(grid_width):
-            if tetris_inst.grid[x][y] != 0:
+            if grid[x][y] != 0:
                 cells_filled += 1
-        score += score_factor * cells_filled * cells_filled
-    return tetris_inst.lines_cleared + score
+        score += score_factor * math.pow(cells_filled, exp)
+
+    # compute the number of holes created in grid
+    # use a flood-fill algorithm to determine this
+    visited = []
+    for x in range(grid_width):
+        visited.append([grid[x][y] != 0 for y in range(grid_height)])
+
+    # however, do not count holes that can directly see the top row, or the "sky"
+    for x in range(grid_width):
+        for y in range(0, grid_height):
+            if not visited[x][y]:
+                visited[x][y] = True
+            else:
+                break
+
+    # use flood fill to find the sizes of all holes
+    hole_sizes = []
+    for x in range(grid_width):
+        for y in range(grid_height):
+            if not visited[x][y]:
+                size = 0
+                stack = []
+                stack.append((x, y))
+                while len(stack) != 0:
+                    current = stack.pop()
+                    size += 1
+                    visited[current[0]][current[1]] = True
+                    # check tile to the left
+                    if current[0] - 1 >= 0:
+                        if not visited[current[0] - 1][current[1]]:
+                            stack.append((current[0] - 1, current[1]))
+                    # check tile to the right
+                    if current[0] + 1 < grid_width:
+                        if not visited[current[0] + 1][current[1]]:
+                            stack.append((current[0] + 1, current[1]))
+                    # check tile above
+                    if current[1] - 1 >= 0:
+                        if not visited[current[0]][current[1] - 1]:
+                            stack.append((current[0], current[1] - 1))
+                    # check tile below
+                    if current[1] + 1 < grid_height:
+                        if not visited[current[0]][current[1] + 1]:
+                            stack.append((current[0], current[1] + 1))
+                hole_sizes.append(size)
+
+    for hole in hole_sizes:
+        score -= hole * hole / 15
+
+    return score
 
 # combines two neural networks by mixing their weights and biases
 def crossover(network1, network2):

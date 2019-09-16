@@ -123,7 +123,7 @@ class TetrominoManager:
             print(''.join(['@' if block_data[x][y] else '.' for x in range(len(block_data))]))
 
     def get_tetromino_type(self, id, rotation=0):
-        return TetrominoManager.get_instance().tmino_list[((id - 1) * 4) + rotation % 4]
+        return TetrominoManager.get_instance().tmino_list[((id - 1) * 4) + (rotation % 4)]
 
 # information a tetromino
 # provides details about rotation and min/max x/y positions
@@ -146,6 +146,6 @@ class Tetromino:
         self.x_pos = x_pos
         self.y_pos = y_pos
 
-    def rotate(self):
+    def rotate(self, clockwise=True):
         self.data = TetrominoManager.get_instance().get_tetromino_type(
-            self.data.id, self.data.rotation + 1)
+            self.data.id, self.data.rotation + (1 if clockwise else -1))

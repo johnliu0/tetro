@@ -1,9 +1,11 @@
 import sys
 import time
 import tkinter as tk
+import math
 from copy import deepcopy
 from random import randint
 from game import Game
+from ai import TetrisAI
 from neuralnetwork import (NeuralNetwork,
     generate_neural_network,
     compute_fitness, crossover, mutate)
@@ -22,10 +24,10 @@ class Tetro(tk.Frame):
         self.cell_width = 35
         # active Tetris games and neural networks
         self.tetris_instances = []
-        self.neural_networks = []
+        self.tetris_ais = []
         # index of the tetris game that is currently being rendered to screen
         self.current_spectating_idx = 0
-        self.generations = 0
+        self.generation = 0
         # load properties from file and init gui
         self.load_props()
         self.pack()
@@ -35,6 +37,7 @@ class Tetro(tk.Frame):
         self.tmino_manager.load_tetrominoes('shapes.txt', self.grid_width, self.grid_height)
         self.before_time = 0
         self.game_running = True
+        self.print_starting_generation()
         self.generate_games(self.population_size)
         self.game_loop()
 
@@ -84,13 +87,14 @@ class Tetro(tk.Frame):
         self.render()
 
         if self.game_running:
-            self.after(10, self.game_loop)
+            # sleep for 1 ms so that your CPU does not blow up!
+            self.after(1, self.game_loop)
 
     def update(self):
         all_lost = True
         # compute all possible tetromino placements for each Tetris instance
         # and choose the move that best optimizes the Tetris score
-        for inst, network in zip(self.tetris_instances, self.neural_networks):
+        for inst, ai in zip(self.tetris_instances, self.tetris_ais):
             # first update the Tetris instance
             inst.update()
             if inst.lost:
@@ -129,39 +133,47 @@ class Tetro(tk.Frame):
                                 break
                             tmino.y_pos -= 1
 
-                            # add the tetromino to the binary grid
-                            for x2 in range(tmino.data.size):
-                                for y2 in range(tmino.data.size):
-                                    if tmino.data.block_data[x2][y2]:
-                                        grid_x = x2 + tmino.x_pos
-                                        grid_y = y2 + tmino.y_pos
-                                        # check if the tetromino cell is out of bounds
-                                        if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                                            continue
-                                        # otherwise update the grid cell with the tetromino cell
-                                        grid[grid_x][grid_y] = True
-
                             # compute a score for this move using the neural network
-                            score = network.activate(grid)
+                            score = ai.compute_score(grid, tmino)
                             if score > best_move[0]:
                                 best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
 
-                            # remove this tetromino from the binary grid
-                            for x2 in range(tmino.data.size):
-                                for y2 in range(tmino.data.size):
-                                    if tmino.data.block_data[x2][y2]:
-                                        grid_x = x2 + tmino.x_pos
-                                        grid_y = y2 + tmino.y_pos
-                                        # check if the tetromino cell is out of bounds
-                                        if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                                            continue
-                                        # otherwise
-                                        grid[grid_x][grid_y] = False
+                            # try moving to the sides and seeing if it produces a better score
+                            tmino.x_pos -= 1
+                            if not inst.is_colliding(tmino):
+                                # check to see if it is grounded properly
+                                tmino.y_pos += 1
+                                if not inst.is_colliding(tmino):
+                                    tmino.y_pos -= 1
+                                    break
+                                tmino.y_pos -= 1
+                                # compute the score for this new position
+                                score = ai.compute_score(grid, tmino)
+                                if score > best_move[0]:
+                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
+                            tmino.x_pos += 2
+                            if not inst.is_colliding(tmino):
+                                tmino.y_pos += 1
+                                if not inst.is_colliding(tmino):
+                                    tmino.y_pos -= 1
+                                    break
+                                tmino.y_pos -= 1
+                                score = ai.compute_score(grid, tmino)
+                                if score > best_move[0]:
+                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
+
                             # once we have found a collision, move on to the next column
                             break
             inst.current_tmino = Tetromino(best_move[3], best_move[1], best_move[2])
         if all_lost:
-            print((' ').join([str(compute_fitness(inst)) for inst in self.tetris_instances]))
+            self.next_generation()
+        # switch the view to the next live Tetris game if the current Tetris game has lost
+        if self.tetris_instances[self.current_spectating_idx].lost:
+            for i in range(self.population_size):
+                if not self.tetris_instances[i].lost:
+                    self.current_spectating_idx = i
+                    break
+
 
     def render(self):
         self.tetris_canvas.delete("all")
@@ -171,42 +183,39 @@ class Tetro(tk.Frame):
 
     def generate_games(self, num=1):
         self.tetris_instances.clear()
-        self.neural_networks.clear()
+        self.tetris_ais.clear()
         for i in range(num):
             self.tetris_instances.append(Game(self.grid_width, self.grid_height))
-            self.neural_networks.append(generate_neural_network(self.grid_width, self.grid_height))
-
-    def update_gui_title(self):
-        self.master.title(
-                f'Tetro | Gen: {self.generations} ' +
-                f'Viewing: {self.current_spectating_idx + 1}/{self.population_size} ' +
-                ('(LOST)' if self.tetris_instances[self.current_spectating_idx].lost else '(ALIVE)'))
-
-    """
-    def render(self):
-        self.tetris_canvas.delete("all")
-        self.tetris_instances[self.current_spectating_idx].render(self.tetris_canvas, self.cell_width)
-
-   # generates some tetris instances and neural networks
-    def generate_games(self, num):
-        self.tetris_instances.clear()
-        self.neural_networks.clear()
-        for i in range(num):
-            self.tetris_instances.append(
-                Game(self.grid_width, self.grid_height, self.enable_lookaheads))
-            self.neural_networks.append(generate_neural_network(self.grid_width, self.grid_height))
+            self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height))
 
     def next_generation(self):
-        self.generations += 1
-        print(f'STARTING GENERATION: {self.generations}')
-        fitness_scores = [(compute_fitness(inst), i) for i, inst in enumerate(self.tetris_instances)]
+        self.generation += 1
+
+        fitness_scores = [(inst.lines_cleared, i) for i, inst in enumerate(self.tetris_instances)]
+
+        print('Lines cleared: ', (' ').join([str(elem[0]) for elem in fitness_scores]))
+        avg_all = 0
+        for elem in fitness_scores:
+            avg_all += elem[0]
+        avg_all /= len(fitness_scores)
+        print('Lines cleared average: ', avg_all)
+
         self.tetris_instances.clear()
         list.sort(fitness_scores, key=lambda elem: elem[0])
         highest = fitness_scores[-self.num_parents:]
+        highest.reverse()
+
+        print('Most lines cleared: ', (' ').join([str(elem[0]) for elem in highest]))
+        avg_most = 0
+        for elem in highest:
+            avg_most += elem[0]
+        avg_most /= len(highest)
+        print('Most lines cleared average: ', avg_most)
+
+        print('Weights of most cleared: ', self.tetris_ais[highest[0][1]].weights)
+
         num_children = 0
         new_neural_networks = []
-
-        print(highest)
 
         # crossover every pair
         for i in range(self.population_size):
@@ -216,15 +225,38 @@ class Tetro(tk.Frame):
             while idx2 == idx1:
                 idx2 = randint(0, self.num_parents - 1)
             # crossover parents and produce a new neural network
-            self.tetris_instances.append(
-                Game(self.grid_width, self.grid_height, self.enable_lookaheads))
-            new_network = crossover(self.neural_networks[highest[idx1][1]],
-                self.neural_networks[highest[idx2][1]])
-            mutate(new_network, self.mutate_rate)
+            self.tetris_instances.append(Game(self.grid_width, self.grid_height))
+            new_network = self.tetris_ais[highest[idx1][1]].crossover(self.tetris_ais[highest[idx2][1]])
+            new_network.mutate(self.mutate_rate)
             new_neural_networks.append(new_network)
 
-        self.neural_networks.clear()
-        self.neural_networks = new_neural_networks
+        self.tetris_ais.clear()
+        self.tetris_ais = new_neural_networks
+        self.print_starting_generation()
+
+    def update_gui_title(self):
+        self.master.title(
+                f'Tetro | Gen: {self.generation} ' +
+                f'Viewing: {self.current_spectating_idx + 1}/{self.population_size} ' +
+                ('(LOST)' if self.tetris_instances[self.current_spectating_idx].lost else '(ALIVE)'))
+
+    def print_starting_generation(self):
+        print()
+        print(f'---- Starting Generation {self.generation} -----')
+
+    """
+    def render(self):
+        self.tetris_canvas.delete("all")
+        self.tetris_instances[self.current_spectating_idx].render(self.tetris_canvas, self.cell_width)
+
+   # generates some tetris instances and neural networks
+    def generate_games(self, num):
+        self.tetris_instances.clear()
+        self.tetris_ais.clear()
+        for i in range(num):
+            self.tetris_instances.append(
+                Game(self.grid_width, self.grid_height, self.enable_lookaheads))
+            self.tetris_ais.append(generate_neural_network(self.grid_width, self.grid_height))
 
     # updates the GUI window title with helpful information
     def update_gui_title(self):
