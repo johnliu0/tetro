@@ -2,17 +2,11 @@ import sys
 import time
 import tkinter as tk
 import math
-import multiprocessing
 from copy import deepcopy
-from random import randint
+from random import random, randint
 from game import Game
-from ai import TetrisAI
-from neuralnetwork import (NeuralNetwork,
-    generate_neural_network,
-    compute_fitness, crossover, mutate)
+from ai import TetrisAI, compute_fitness
 from tetromino import TetrominoManager, Tetromino
-
-print(multiprocessing.cpu_count())
 
 class Tetro(tk.Frame):
     def __init__(self, master = None):
@@ -40,6 +34,7 @@ class Tetro(tk.Frame):
         self.tmino_manager.load_tetrominoes('shapes.txt', self.grid_width, self.grid_height)
         self.before_time = 0
         self.game_running = True
+        self.pause = False
         self.print_starting_generation()
         self.generate_games(self.population_size)
         self.game_loop()
@@ -85,7 +80,9 @@ class Tetro(tk.Frame):
         delta_time = self.current_time - self.before_time
         self.before_time = self.current_time
 
-        self.update()
+        if not self.pause:
+            self.update()
+
         self.update_gui_title()
         self.render()
 
@@ -194,48 +191,53 @@ class Tetro(tk.Frame):
     def next_generation(self):
         self.generation += 1
 
-        fitness_scores = [(inst.lines_cleared, i) for i, inst in enumerate(self.tetris_instances)]
+        fitness_scores = [(compute_fitness(inst), i) for i, inst in enumerate(self.tetris_instances)]
 
-        print('Lines cleared: ', (' ').join([str(elem[0]) for elem in fitness_scores]))
+        print('Lines cleared: ', self.format_float_list([elem[0] for elem in fitness_scores], num_decimals=0, delimiter=' '))
         avg_all = 0
         for elem in fitness_scores:
             avg_all += elem[0]
         avg_all /= len(fitness_scores)
-        print('Lines cleared average: ', avg_all)
+        print('Lines cleared average: ', '{:.1f}'.format(avg_all))
 
         self.tetris_instances.clear()
         list.sort(fitness_scores, key=lambda elem: elem[0])
         highest = fitness_scores[-self.num_parents:]
         highest.reverse()
 
-        print('Most lines cleared: ', (' ').join([str(elem[0]) for elem in highest]))
+        print('Most lines cleared: ', self.format_float_list([elem[0] for elem in highest], num_decimals=0, delimiter=' '))
         avg_most = 0
         for elem in highest:
             avg_most += elem[0]
         avg_most /= len(highest)
-        print('Most lines cleared average: ', avg_most)
+        print('Most lines cleared average: ', '{:.1f}'.format(avg_most))
 
-        print('Weights of most cleared: ', self.tetris_ais[highest[0][1]].weights)
-
-        if avg_most < 0.0001:
-            self.generate_games(self.population_size)
-            return
+        print('Most cleared row filled weights: ', self.format_float_list(self.tetris_ais[highest[0][1]].row_filled_weights))
+        print('Most cleared hole size weights: ', self.format_float_list(self.tetris_ais[highest[0][1]].hole_size_weights))
+        print('Most cleared hole x pos weights: ', self.format_float_list(self.tetris_ais[highest[0][1]].hole_x_pos_weights))
+        print('Most cleared hole height weights: ', self.format_float_list(self.tetris_ais[highest[0][1]].hole_height_weights))
 
         num_children = 0
         new_neural_networks = []
 
         # crossover every pair
-        for i in range(self.population_size):
+        crossover_probability = 0.8
+        while len(new_neural_networks) != self.population_size:
+
             # randomly select two different parents
             idx1 = randint(0, self.num_parents - 1)
             idx2 = idx1
             while idx2 == idx1:
                 idx2 = randint(0, self.num_parents - 1)
-            # crossover parents and produce a new neural network
-            self.tetris_instances.append(Game(self.grid_width, self.grid_height))
-            new_network = self.tetris_ais[highest[idx1][1]].crossover(self.tetris_ais[highest[idx2][1]])
-            new_network.mutate(self.mutate_rate)
-            new_neural_networks.append(new_network)
+
+            if random() <= crossover_probability:
+                # crossover parents and produce a new neural network
+                self.tetris_instances.append(Game(self.grid_width, self.grid_height))
+                new_network = self.tetris_ais[highest[idx1][1]].crossover(self.tetris_ais[highest[idx2][1]])
+                new_network.mutate(self.mutate_rate)
+                new_neural_networks.append(new_network)
+            else:
+                new_neural_networks.append(self.tetris_ais[highest[idx1][1]])
 
         self.tetris_ais.clear()
         self.tetris_ais = new_neural_networks
@@ -250,6 +252,9 @@ class Tetro(tk.Frame):
     def print_starting_generation(self):
         print()
         print(f'---- Starting Generation {self.generation} -----')
+
+    def format_float_list(self, float_list, num_decimals=2, delimiter=', '):
+        return delimiter.join([('{:.' + str(num_decimals) + 'f}').format(num) for num in float_list])
 
     """
     def render(self):
@@ -294,6 +299,8 @@ class Tetro(tk.Frame):
             self.tetris_instances[self.current_spectating_idx].rotate()
         elif event.char == ' ':
             self.tetris_instances[self.current_spectating_idx].drop()
+        elif event.char == 'p':
+            self.pause = not self.pause
         self.update_gui_title()
         self.render()
 
