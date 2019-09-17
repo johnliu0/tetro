@@ -3,21 +3,19 @@ from random import random, randint
 from copy import deepcopy
 
 class TetrisAI:
-    def __init__(self, grid_width, grid_height, weights=[]):
+    def __init__(self, grid_width, grid_height, weights):
         self.grid_width = grid_width
         self.grid_height = grid_height
         self.weights = weights
         self.hole_weights_size = 10
         if len(self.weights) == 0:
-            """# scores for how filled a row is
+            # scores for how filled a row is
             for i in range(grid_width + 1):
-                self.weights.append(random())
+                self.weights.append(random() * 2 - 1)
             # scores for how large a hole is
             # if a hole exceeds this number, then the last weight is used
             for i in range(self.hole_weights_size):
-                self.weights.append(random())"""
-
-            self.weights = [0.7112714461917173, 0.2389235992636648, 0.3543599998985706, 0.002794156832754524, 0.0818543349841857, 0.07316713318300061, 0.20932288485496398, 0.21583637249217869, 0.26380968462349674, 0.35201816486172544, 0.9325689569108521, 0.5061789745049843, 0.6853766746288739, 0.3723816930390321, 0.25656705629428456, 0.5602335482545915, 0.7335582661672582, 0.0049787371814449255, 0.25714561216586895, 0.7434473539755115, 0.02387371616911571]
+                self.weights.append(random() * 2 - 1)
 
     # computes a score for the given binary grid arrangement and tetromino placement
     # True should indicate an occupied cell, False should indicate empty cell
@@ -90,9 +88,9 @@ class TetrisAI:
 
         for size in hole_sizes:
             if size >= self.hole_weights_size:
-                score -= self.weights[-1]
+                score += self.weights[-1]
             else:
-                score -= self.weights[self.grid_width + size]
+                score += self.weights[self.grid_width + size]
 
         #for y in range(self.grid_height):
             #print(('').join(['@' if grid[x][y] else '.' for x in range(self.grid_width)]))
@@ -120,4 +118,4 @@ class TetrisAI:
     def mutate(self, mutate_rate):
         for i in range(len(self.weights)):
             if random() <= mutate_rate:
-                self.weights[i] = random()
+                self.weights[i] = random() * 2 - 1

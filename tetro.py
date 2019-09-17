@@ -2,6 +2,7 @@ import sys
 import time
 import tkinter as tk
 import math
+import multiprocessing
 from copy import deepcopy
 from random import randint
 from game import Game
@@ -10,6 +11,8 @@ from neuralnetwork import (NeuralNetwork,
     generate_neural_network,
     compute_fitness, crossover, mutate)
 from tetromino import TetrominoManager, Tetromino
+
+print(multiprocessing.cpu_count())
 
 class Tetro(tk.Frame):
     def __init__(self, master = None):
@@ -138,7 +141,7 @@ class Tetro(tk.Frame):
                             if score > best_move[0]:
                                 best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
 
-                            # try moving to the sides and seeing if it produces a better score
+                            """# try moving to the sides and seeing if it produces a better score
                             tmino.x_pos -= 1
                             if not inst.is_colliding(tmino):
                                 # check to see if it is grounded properly
@@ -160,7 +163,7 @@ class Tetro(tk.Frame):
                                 tmino.y_pos -= 1
                                 score = ai.compute_score(grid, tmino)
                                 if score > best_move[0]:
-                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
+                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]"""
 
                             # once we have found a collision, move on to the next column
                             break
@@ -186,7 +189,7 @@ class Tetro(tk.Frame):
         self.tetris_ais.clear()
         for i in range(num):
             self.tetris_instances.append(Game(self.grid_width, self.grid_height))
-            self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height))
+            self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height, []))
 
     def next_generation(self):
         self.generation += 1
@@ -213,6 +216,10 @@ class Tetro(tk.Frame):
         print('Most lines cleared average: ', avg_most)
 
         print('Weights of most cleared: ', self.tetris_ais[highest[0][1]].weights)
+
+        if avg_most < 0.0001:
+            self.generate_games(self.population_size)
+            return
 
         num_children = 0
         new_neural_networks = []
