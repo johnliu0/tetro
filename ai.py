@@ -42,6 +42,43 @@ class TetrisAI:
 
         #self.weights = [0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.36, 0.49, 0.64, 0.81, 1.0, 0.3, 0.4, 0.9, 1.6, 2.5, 3.6, 4.9, 6.4, 8.1, 10.0]
 
+    # determine the next move given a Tetris instance
+    # returns a tuple in the form (x_pos, y_pos, rotation)
+    # representing how the current tetromino in the game should be placed
+    def compute_move(self, inst):
+        tmino_id = inst.current_tmino.data.id
+        grid = inst.to_boolean_grid()
+
+        # keep track of the best move that can be made
+        # a list in the format: (score, x_pos, y_pos, rotation)
+        best_move = [float('-inf'), 0, 0, None]
+        # try each rotation
+        for rotation in range(4):
+            # initialize the rotated tetromino
+            tmino = Tetromino(inst.tmino_manager.get_tetromino_type(tmino_id, rotation))
+            # try each possible column
+            for x in range(tmino.data.min_x, tmino.data.max_x + 1):
+                tmino.x_pos = x
+                # find the lowest point that it can drop to
+                for y in range(tmino.data.min_y, tmino.data.max_y + 2):
+                    tmino.y_pos = y
+                    # if the tetromino is colliding, then the previous move
+                    # is the furthest it could have dropped
+                    if inst.is_colliding(tmino):
+                        # however if the tetromino was colliding even at
+                        # its min y position, then it is not possible
+                        # to make a move in this column
+                        if tmino.y_pos == tmino.data.min_y:
+                            break
+                        tmino.y_pos -= 1
+                        # compute a score for this move using the neural network
+                        score = self.compute_score(grid, tmino)
+                        if score > best_move[0]:
+                            best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data.rotation]
+                        # once we have found a collision, move on to the next column
+                        break
+        return tuple(best_move[1:])
+
     # computes a score for the given binary grid arrangement and tetromino placement
     # True should indicate an occupied cell, False should indicate empty cell
     def compute_score(self, grid, tetromino):

@@ -1,7 +1,8 @@
 import sys
 import time
-import tkinter as tk
 import math
+import tkinter as tk
+import multiprocessing as mp
 from copy import deepcopy
 from random import random, randint
 from game import Game
@@ -18,7 +19,7 @@ class Tetro(tk.Frame):
         self.population_size = 0
         self.num_parents = 0
         self.mutate_rate = 0
-        self.cell_width = 35
+        self.cell_width = 7
         # active Tetris games and neural networks
         self.tetris_instances = []
         self.tetris_ais = []
@@ -60,7 +61,7 @@ class Tetro(tk.Frame):
                 # parse key=value
                 idx_equals = line.find('=')
                 if idx_equals == -1:
-                    print(f"Line corrupt: {line}")
+                    print(f'Line corrupt: {line}')
                 key = line[:idx_equals]
                 value = line[idx_equals + 1:]
                 if key == 'grid_width':
@@ -80,6 +81,8 @@ class Tetro(tk.Frame):
         delta_time = self.current_time - self.before_time
         self.before_time = self.current_time
 
+        print('Time since last update: ', delta_time)
+
         if not self.pause:
             self.update()
 
@@ -91,82 +94,39 @@ class Tetro(tk.Frame):
             self.after(1, self.game_loop)
 
     def update(self):
+        # first update all tetris instances
         all_lost = True
-        # compute all possible tetromino placements for each Tetris instance
-        # and choose the move that best optimizes the Tetris score
-        for inst, ai in zip(self.tetris_instances, self.tetris_ais):
-            # first update the Tetris instance
+        for inst in self.tetris_instances:
             inst.update()
-            if inst.lost:
-                continue
-            all_lost = False
-            tmino_id = inst.current_tmino.data.id
+            if not inst.lost:
+                all_lost = False
 
-            # convert grid to a binary representation
-            # where True is an occupied cell and False is an empty cell
-            grid = []
-            for x in range(self.grid_width):
-                grid.append([])
-                for y in range(self.grid_height):
-                    grid[-1].append(inst.grid[x][y] != 0)
-
-            # keep track of the best move that can be made
-            # a list in the format: (score, x_pos, y_pos, None)
-            best_move = [float('-inf'), 0, 0, None]
-            # try each rotation
-            for rotation in range(4):
-                # initialize the rotated tetromino
-                tmino = Tetromino(self.tmino_manager.get_tetromino_type(tmino_id, rotation))
-                # try each possible column
-                for x in range(tmino.data.min_x, tmino.data.max_x + 1):
-                    tmino.x_pos = x
-                    # find the lowest point that it can drop to
-                    for y in range(tmino.data.min_y, tmino.data.max_y + 2):
-                        tmino.y_pos = y
-                        # if the tetromino is colliding, then the previous move
-                        # is the furthest it could have dropped
-                        if inst.is_colliding(tmino):
-                            # however if the tetromino was colliding even at
-                            # its min y position, then it is not possible
-                            # to make a move in this column
-                            if tmino.y_pos == tmino.data.min_y:
-                                break
-                            tmino.y_pos -= 1
-
-                            # compute a score for this move using the neural network
-                            score = ai.compute_score(grid, tmino)
-                            if score > best_move[0]:
-                                best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
-
-                            """# try moving to the sides and seeing if it produces a better score
-                            tmino.x_pos -= 1
-                            if not inst.is_colliding(tmino):
-                                # check to see if it is grounded properly
-                                tmino.y_pos += 1
-                                if not inst.is_colliding(tmino):
-                                    tmino.y_pos -= 1
-                                    break
-                                tmino.y_pos -= 1
-                                # compute the score for this new position
-                                score = ai.compute_score(grid, tmino)
-                                if score > best_move[0]:
-                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]
-                            tmino.x_pos += 2
-                            if not inst.is_colliding(tmino):
-                                tmino.y_pos += 1
-                                if not inst.is_colliding(tmino):
-                                    tmino.y_pos -= 1
-                                    break
-                                tmino.y_pos -= 1
-                                score = ai.compute_score(grid, tmino)
-                                if score > best_move[0]:
-                                    best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data]"""
-
-                            # once we have found a collision, move on to the next column
-                            break
-            inst.current_tmino = Tetromino(best_move[3], best_move[1], best_move[2])
+        # start next generation if all Tetris instances have lost
         if all_lost:
             self.next_generation()
+            return
+
+
+        # compute moves to make using the AIs
+        # the moves are generated with Python's multiprocessing ability
+        moves = ()
+        with mp.Pool() as pool:
+            results = []
+            for i, inst in enumerate(self.tetris_instances):
+                if not inst.lost:
+                    results.append((pool.apply_async(self.tetris_ais[i].compute_move, (inst,)), i))
+            moves = [(r[0].get(), r[1]) for r in results]
+
+        # finalize moves
+        for move in moves:
+            self.tetris_instances[move[1]].current_tmino = Tetromino(
+                self.tmino_manager.get_tetromino_type(
+                    self.tetris_instances[move[1]].current_tmino.data.id,
+                    move[0][2]
+                ),
+                move[0][0], move[0][1]
+            );
+
         # switch the view to the next live Tetris game if the current Tetris game has lost
         if self.tetris_instances[self.current_spectating_idx].lost:
             for i in range(self.population_size):

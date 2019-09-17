@@ -157,7 +157,6 @@ class Game:
                     if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
                         continue
                     self.grid[grid_x][grid_y] = self.current_tmino.data.id
-
         # check for cleared lines
         # start from lowest possible line and go up
         current_y = self.current_tmino.y_pos + self.current_tmino.data.size - 1
@@ -189,3 +188,14 @@ class Game:
         if self.is_colliding(self.current_tmino):
             self.current_tmino = None
             self.lost = True
+
+    # returns a boolean representation of the current grid
+    # where False is an empty cell and True is a filled cell
+    # note that this creates a new grid in memory
+    def to_boolean_grid(self):
+        grid = []
+        for x in range(self.grid_width):
+            grid.append([])
+            for y in range(self.grid_height):
+                grid[-1].append(self.grid[x][y] != 0)
+        return grid
