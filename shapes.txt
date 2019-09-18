@@ -8,7 +8,7 @@
 
 # ***** L *****
 start
-color=cyan
+color=0,255,255
 size=4
 row ....
 row OOOO
@@ -18,7 +18,7 @@ end
 
 # ***** J *****
 start
-color=blue
+color=0,0,255
 size=3
 row O..
 row OOO
@@ -27,7 +27,7 @@ end
 
 # ***** L *****
 start
-color=orange
+color=255,156,0
 size=3
 row ..O
 row OOO
@@ -36,7 +36,7 @@ end
 
 # ***** O *****
 start
-color=yellow
+color=255,255,0
 size=2
 row OO
 row OO
@@ -44,7 +44,7 @@ end
 
 # ***** S *****
 start
-color=green
+color=0,255,0
 size=3
 row .OO
 row OO.
@@ -53,7 +53,7 @@ end
 
 # ***** T *****
 start
-color=purple
+color=128,0,128
 size=3
 row .O.
 row OOO
@@ -62,7 +62,7 @@ end
 
 # ***** Z *****
 start
-color=red
+color=255,0,0
 size=3
 row OO.
 row .OO

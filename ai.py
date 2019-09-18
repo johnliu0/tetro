@@ -30,6 +30,11 @@ class TetrisAI:
             for i in range(self.weights_cap):
                 self.hole_height_weights.append(random())
 
+        # test weights; performs fairly well
+        self.row_filled_weights = [0.96, 0.57, 0.33, 0.44, 0.17, 0.26, 0.13, 0.12, 0.27, 0.44, 0.97]
+        self.hole_x_pos_weights = [0.77, 0.64, 0.10, 0.28, 0.22, 0.87, 0.29, 0.45, 0.86, 0.49]
+        self.hole_size_weights = [0.13, 0.93, 0.75, 0.53, 0.43, 0.83, 0.30, 0.43, 0.43, 0.34]
+        self.hole_height_weights = [0.61, 0.73, 0.62, 0.71, 0.90, 0.22, 0.41, 0.75, 0.31, 0.68]
 
         """if len(self.weights) == 0:
             # scores for how filled a row is
@@ -213,6 +218,15 @@ class TetrisAI:
                 self.hole_size_weights[i] = random()
             if random() <= mutate_rate:
                 self.hole_height_weights[i] = random()
+
+    # returns a copy of this AI; all its weights will be copied
+    def clone(self):
+        return TetrisAI(
+            self.grid_width, self.grid_height,
+            deepcopy(self.row_filled_weights),
+            deepcopy(self.hole_size_weights),
+            deepcopy(self.hole_x_pos_weights),
+            deepcopy(self.hole_height_weights))
 
 def compute_possible_moves(tetris_inst):
     tmino_id = tetris_inst.current_tmino.data.id

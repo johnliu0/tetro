@@ -1,4 +1,5 @@
 import math
+import pygame
 from tetromino import TetrominoManager
 
 # an instance of the Tetris game
@@ -31,20 +32,16 @@ class Game:
             self.current_tmino.y_pos -= 1
             self.place_tetromino()
 
-    def render(self, canvas, cell_width):
-        # draw background
-        canvas.create_rectangle(0, 0,
-            cell_width * self.grid_width, cell_width * self.grid_height, fill="black")
-
+    def render(self, surface, cell_width):
         # draw grid
         for x in range(self.grid_width):
             for y in range(self.grid_height):
                 # draw the cell if it is non empty
                 if self.grid[x][y] != 0:
-                    canvas.create_rectangle(
-                        x * cell_width, y * cell_width,
-                        (x + 1) * cell_width, (y + 1) * cell_width,
-                        fill=self.tmino_manager.get_tetromino_color(self.grid[x][y]))
+                    pygame.draw.rect(
+                        surface,
+                        self.tmino_manager.get_tetromino_color(self.grid[x][y]),
+                        (x * cell_width, y * cell_width, cell_width - 1, cell_width - 1))
 
         # draw current tetromino
         if not self.lost:
@@ -54,10 +51,11 @@ class Game:
             for x in range(len(block_data)):
                 for y in range(len(block_data[0])):
                     if block_data[x][y]:
-                        canvas.create_rectangle(
-                            (x + pos_x) * cell_width, (y + pos_y) * cell_width,
-                            (x + pos_x + 1) * cell_width, (y + pos_y + 1) * cell_width,
-                            fill=self.current_tmino.data.color)
+                        pygame.draw.rect(
+                            surface,
+                            self.current_tmino.data.color,
+                            ((x + pos_x) * cell_width, (y + pos_y) * cell_width,
+                            cell_width - 1, cell_width - 1))
 
     # attempts to move the tetromino left
     def move_left(self):

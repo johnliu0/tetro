@@ -63,7 +63,7 @@ class TetrominoManager:
                     key = line[:idx_equals]
                     value = line[idx_equals + 1:]
                     if key == 'color':
-                        color = value
+                        color = tuple([int(token) for token in value.split(',')])
 
     # given tetromino block data; compute information
     # about rotation and position and add to tetromino_types
