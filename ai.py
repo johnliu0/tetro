@@ -1,4 +1,5 @@
 import math
+from time import perf_counter
 from tetromino import Tetromino
 from random import random, randint
 from copy import deepcopy
@@ -14,7 +15,7 @@ class TetrisAI:
         self.hole_size_weights = hole_size_weights
         self.hole_x_pos_weights = hole_x_pos_weights
         self.hole_height_weights = hole_height_weights
-
+        # generate random weights if not provided
         if len(row_filled_weights) == 0:
             for i in range(grid_width):
                 self.row_filled_weights.append(random())
@@ -30,33 +31,24 @@ class TetrisAI:
             for i in range(self.weights_cap):
                 self.hole_height_weights.append(random())
 
-        # test weights; performs fairly well
+        # test weights, performs ok
         self.row_filled_weights = [0.96, 0.57, 0.33, 0.44, 0.17, 0.26, 0.13, 0.12, 0.27, 0.44, 0.97]
         self.hole_x_pos_weights = [0.77, 0.64, 0.10, 0.28, 0.22, 0.87, 0.29, 0.45, 0.86, 0.49]
         self.hole_size_weights = [0.13, 0.93, 0.75, 0.53, 0.43, 0.83, 0.30, 0.43, 0.43, 0.34]
         self.hole_height_weights = [0.61, 0.73, 0.62, 0.71, 0.90, 0.22, 0.41, 0.75, 0.31, 0.68]
 
-        """if len(self.weights) == 0:
-            # scores for how filled a row is
-            for i in range(grid_width + 1):
-                self.weights.append(random() * 2 - 1)
-            # scores for how large a hole is
-            # if a hole exceeds this number, then the last weight is used
-            for i in range(self.hole_weights_size):
-                self.weights.append(random() * 2 - 1)"""
-
-        #self.weights = [0.0, 0.01, 0.04, 0.09, 0.16, 0.25, 0.36, 0.49, 0.64, 0.81, 1.0, 0.3, 0.4, 0.9, 1.6, 2.5, 3.6, 4.9, 6.4, 8.1, 10.0]
-
-    # determine the next move given a Tetris instance
-    # returns a tuple in the form (x_pos, y_pos, rotation)
-    # representing how the current tetromino in the game should be placed
+    # determine what move should be made given a Tetris instance
+    # the type of Tetromino used is the Tetris instance current tetromino
     def compute_move(self, inst):
         tmino_id = inst.current_tmino.data.id
         grid = inst.to_boolean_grid()
 
+        start_time = perf_counter()
+        compute_time = 0
+
         # keep track of the best move that can be made
-        # a list in the format: (score, x_pos, y_pos, rotation)
-        best_move = [float('-inf'), 0, 0, None]
+        # a list in the format: (score, Tetromino)
+        best_move = [float('-inf'), None]
         # try each rotation
         for rotation in range(4):
             # initialize the rotated tetromino
@@ -76,13 +68,26 @@ class TetrisAI:
                         if tmino.y_pos == tmino.data.min_y:
                             break
                         tmino.y_pos -= 1
+
                         # compute a score for this move using the neural network
+                        t = perf_counter()
                         score = self.compute_score(grid, tmino)
+                        compute_time += perf_counter() - t
+
+
                         if score > best_move[0]:
-                            best_move = [score, tmino.x_pos, tmino.y_pos, tmino.data.rotation]
+                            best_move = [score, Tetromino(
+                                inst.tmino_manager.get_tetromino_type(tmino_id, rotation), tmino.x_pos, tmino.y_pos)]
                         # once we have found a collision, move on to the next column
                         break
-        return tuple(best_move[1:])
+
+        total_time = perf_counter() - start_time
+        print()
+        print('total: ', total_time * 1000)
+        print('placement: ', (total_time - compute_time) * 1000)
+        print('compute: ', compute_time * 1000)
+
+        return best_move[1]
 
     # computes a score for the given binary grid arrangement and tetromino placement
     # True should indicate an occupied cell, False should indicate empty cell
@@ -268,9 +273,4 @@ def compute_possible_moves(tetris_inst):
 # computes the overall score of a Tetris game
 def compute_fitness(inst):
     score = inst.lines_cleared
-    """# subtract from score for each hole in grid
-    for x in range(len(inst.grid)):
-        for y in range(len(inst.grid[0])):
-            if inst.grid[x][y] == 0:
-                score -= 0.2"""
     return score
