@@ -4,7 +4,7 @@ import pygame
 from copy import deepcopy
 from random import random, randint
 from game import Game
-from ai import TetrisAI, compute_fitness
+from ai import TetrisAI
 from tetromino import TetrominoManager, Tetromino
 
 class Tetro:
@@ -80,7 +80,7 @@ class Tetro:
                 self.update()
             self.render()
             self.update_gui_title()
-            pygame.time.wait(10)
+            pygame.time.wait(1)
             game_clock.tick()
 
     def update(self):
@@ -132,11 +132,11 @@ class Tetro:
         self.tetris_ais.clear()
         for i in range(num):
             self.tetris_instances.append(Game(self.grid_width, self.grid_height))
-            self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height))
+            self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], []))
 
     def next_generation(self):
         self.generation += 1
-        fitness_scores = [(compute_fitness(inst), i) for i, inst in enumerate(self.tetris_instances)]
+        fitness_scores = [(inst.lines_cleared, i) for i, inst in enumerate(self.tetris_instances)]
         list.sort(fitness_scores, key=lambda elem: elem[0])
         fitness_scores.reverse()
         avg_all = sum([elem[0] for elem in fitness_scores]) / len(fitness_scores)
@@ -150,12 +150,11 @@ class Tetro:
 
         print('Most cleared row filled weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].row_filled_weights, brackets=True))
         print('Most cleared hole size weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_size_weights, brackets=True))
-        print('Most cleared hole x pos weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_x_pos_weights, brackets=True))
-        print('Most cleared hole height weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_height_weights, brackets=True))
+        print('Most cleared column diff weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].column_diff_weights, brackets=True))
 
         new_ais = []
-        if avg_most < 1.0:
-            [new_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], [], [])) for i in range(self.population_size)]
+        if avg_most < 1 / self.selection_size:
+            [new_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], [])) for i in range(self.population_size)]
         else:
             # produce new generation
             # let half of the most fit of this generation continue on as is
@@ -164,10 +163,10 @@ class Tetro:
             # then crossover the most fit until the population size is reached
             while len(new_ais) != self.population_size:
                 # randomly select two different parents
-                idx1 = randint(0, self.selection_size - 1)
+                idx1 = randint(0, len(highest_scores) - 1)
                 idx2 = idx1
                 while idx2 == idx1:
-                    idx2 = randint(0, self.selection_size - 1)
+                    idx2 = randint(0, len(highest_scores) - 1)
                 new_ais.append(self.tetris_ais[highest_scores[idx1][1]].crossover(
                     self.tetris_ais[highest_scores[idx2][1]]))
                 new_ais[-1].mutate(self.mutate_rate)
