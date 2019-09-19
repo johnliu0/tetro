@@ -8,10 +8,10 @@
 grid_width=10
 grid_height=20
 # population size at any generation
-population_size=100
+population_size=75
 # how many networks to use for next generation
-selection_size=15
+selection_size=10
 # probability of crossover
 crossover_rate=0.85
 # mutation chance, expressed as a decimal
-mutate_rate=0.08
+mutate_rate=0.02

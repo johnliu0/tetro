@@ -18,22 +18,18 @@ class TetrisAI:
         if len(row_filled_weights) == 0:
             for i in range(grid_width + 1):
                 self.row_filled_weights.append(self.random_weight())
-            #self.row_filled_weights =  [0.00, 0.01, 0.04, 0.09, 0.16, 0.25, 0.45, 0.49, 0.64, 0.81, 0.99]
         if len(hole_size_weights) == 0:
             for i in range(self.weights_cap):
                 self.hole_size_weights.append(self.random_weight())
-            #self.hole_size_weights = [0.1, 0.4, 0.9, 1.6, 2.5, 3.6, 4.9, 6.4, 8.1, 10.0]
         if len(column_diff_weights) == 0:
             for i in range(grid_height + 1):
                 self.column_diff_weights.append(self.random_weight())
-            #self.column_diff_weights = [0.01, 0.02, 0.13, 0.13, 0.41, 0.21, 0.45, 0.14, 0.11, 0.42, 0.69, 0.93, 0.58, 0.82, 0.99, 0.96, 0.51, 0.50, 0.49, 0.31, 0.10]
 
-        # test weights, performs ok
-        #self.row_filled_weights = [0.96, 0.57, 0.33, 0.44, 0.17, 0.26, 0.13, 0.12, 0.27, 0.44, 0.97]
-        #self.hole_size_weights = [0.13, 0.93, 0.75, 0.53, 0.43, 0.83, 0.30, 0.43, 0.43, 0.34]
-        #self.column_diff_weights = []
-        #self.hole_x_pos_weights = [0.77, 0.64, 0.10, 0.28, 0.22, 0.87, 0.29, 0.45, 0.86, 0.49]
-        #self.hole_height_weights = [0.61, 0.73, 0.62, 0.71, 0.90, 0.22, 0.41, 0.75, 0.31, 0.68]
+        # test weights that perform ok
+        self.row_filled_weights = [1.97, 1.18, 0.32, 0.03, 0.30, 0.38, 0.52, 0.42, 0.17, 0.89, 1.83]
+        self.hole_size_weights = [2.05, 1.56, 2.46, 1.44, 0.92, 1.27, 1.04, 1.91, 0.08, 0.52]
+        self.column_diff_weights = [0.16, 0.19, 0.40, 0.42, 1.46, 0.73, 0.02, 0.58, 0.48, 0.62, 0.64, 0.43, 0.39, 0.23, 0.88, 0.28, 1.01, 0.26, 0.59, 0.48, 0.21]
+
 
     # determine what move should be made given a Tetris instance
     # the type of Tetromino used is the Tetris instance current tetromino
@@ -44,10 +40,7 @@ class TetrisAI:
         heights = self.compute_heightmap(grid)
         best_move = [float('-inf'), None]
 
-        start_time = perf_counter()
-        compute_time = 0
-
-        for rotation in range(4):
+        for rotation in inst.tmino_manager.unique_tmino_list[tmino_id - 1]:
             # to compute each possible drop placement, first find the largest value
             # in the heightmap that contains the tetromino at each section of columns
             tmino = Tetromino(inst.tmino_manager.get_tetromino_type(inst.current_tmino.data.id, rotation))
@@ -62,30 +55,18 @@ class TetrisAI:
                             greatest_height = heights[j]
                 # we are guaranteed that the tetromino will not have collided with
                 # anything before this greatest height value, all that is needed
-                # to do is find the correct point of contact now
-                for j in range(max(greatest_height - tmino_size, tmino.data.min_y), tmino.data.max_y + 1):
+                # to do now is to find the correct point of contact
+                for j in range(max(self.grid_height - greatest_height - tmino_size, tmino.data.min_y), tmino.data.max_y + 1):
                     tmino.y_pos = j
                     if inst.is_colliding(tmino):
                         tmino.y_pos = j - 1
                         break
                 if not inst.is_colliding(tmino):
                     # tetromino is now at a possible placement
-                    t = perf_counter()
                     score = self.compute_score(grid, tmino)
-                    compute_time += perf_counter() - t
                     if score > best_move[0]:
                         best_move = [score, Tetromino(
                             inst.tmino_manager.get_tetromino_type(tmino_id, rotation), tmino.x_pos, tmino.y_pos)]
-
-        total_time = perf_counter() - start_time
-        #print()
-        #print('total: ', total_time * 1000)
-        #print('placement: ', (total_time - compute_time) * 1000)
-        #print('compute: ', compute_time * 1000)
-        if best_move[1] == None:
-            print(heights)
-            self.print_grid(inst.grid)
-
         return best_move[1]
 
     # computes a score for the given binary grid arrangement and tetromino placement
@@ -142,155 +123,6 @@ class TetrisAI:
 
         return score
 
-        """# add to score based on how filled the rows are
-        score = 0
-        for y in range(tetromino.y_pos, tetromino.y_pos + tetromino.data.size):
-            if y < 0 or y >= self.grid_height:
-                continue
-            cells_filled = 0
-            for x in range(self.grid_width):
-                if grid[x][y]:
-                    cells_filled += 1
-            score += self.row_filled_weights[cells_filled]
-
-        # find the height of the columns that the tetromino belongs to and adjacent columns
-        start_x = max(tetromino.x_pos - 1, 0)
-        end_x = min(tetromino.x_pos + tetromino.data.size, self.grid_width - 1)
-        column_heights = []
-        for x in range(start_x, end_x + 1):
-            for y in range(0, self.grid_height):
-                if not grid[x][y]:
-                    if y == self.grid_height - 1:
-                        column_heights.append(0)
-                else:
-                    column_heights.append(self.grid_height - y)
-                    break
-
-        # subtract from score based on difference in successive columns
-        for i in range(1, len(column_heights)):
-            score -= self.column_diff_weights[abs(column_heights[i] - column_heights[i - 1])]
-        # subtract from based on height of holes found in column
-        for i in range(len(column_heights)):
-            x = start_x + i
-            hole_height = 0
-            for j in range(column_heights[i]):
-                y = self.grid_height - column_heights[i]
-                if grid[x][y]:
-                    if hole_height == 0:
-                        continue
-                    else:
-                        score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
-                        hole_height = 0
-                else:
-                    hole_height += 1
-            if hole_height == 0:
-                continue
-            else:
-                score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
-                hole_height = 0"""
-
-
-        # remove this tetromino from the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                grid_x = x + tetromino.x_pos
-                grid_y = y + tetromino.y_pos
-                if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                    continue
-                if tetromino.data.block_data[x][y]:
-                    grid[grid_x][grid_y] = False
-
-        return score
-        # add the tetromino to the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                if tetromino.data.block_data[x][y]:
-                    grid_x = x + tetromino.x_pos
-                    grid_y = y + tetromino.y_pos
-                    # check if the tetromino cell is out of bounds
-                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                        continue
-                    # otherwise update the grid cell with the tetromino cell
-                    grid[grid_x][grid_y] = True
-
-        # fitness is based on lines cleared and
-        # number of cells filled on grid
-        # the more cells are filled per row, the higher the score
-        # lines cleared are worth exactly 1 point
-        score = 0
-        for y in range(self.grid_height):
-            cells_filled = 0
-            for x in range(self.grid_width):
-                if grid[x][y] != 0:
-                    cells_filled += 1
-            score += self.row_filled_weights[cells_filled]
-
-        # compute the number of holes created in grid
-        # first initialize a 2d list to keep track of visited cells
-        visited = deepcopy(grid)
-
-        # do not count cells that can directly see the top row, or the "sky"
-        column_heights = []
-        for x in range(self.grid_width):
-            for y in range(0, self.grid_height):
-                if not visited[x][y]:
-                    visited[x][y] = True
-                    if y == self.grid_height - 1:
-                        column_heights.append(0)
-                else:
-                    column_heights.append(self.grid_height - y)
-                    break
-
-        # compute difference in succesive columns
-        for i in range(1, len(column_heights)):
-            score -= self.column_diff_weights[abs(column_heights[i] - column_heights[i - 1])]
-
-        # use flood fill to find the sizes of all holes
-        for x in range(self.grid_width):
-            for y in range(self.grid_height):
-                if not visited[x][y]:
-                    size = 0
-                    stack = []
-                    stack.append((x, y))
-                    while len(stack) != 0:
-                        current = stack.pop()
-                        size += 1
-                        visited[current[0]][current[1]] = True
-                        # check tile to the left
-                        if current[0] - 1 >= 0:
-                            if not visited[current[0] - 1][current[1]]:
-                                stack.append((current[0] - 1, current[1]))
-                        # check tile to the right
-                        if current[0] + 1 < self.grid_width:
-                            if not visited[current[0] + 1][current[1]]:
-                                stack.append((current[0] + 1, current[1]))
-                        # check tile above
-                        if current[1] - 1 >= 0:
-                            if not visited[current[0]][current[1] - 1]:
-                                stack.append((current[0], current[1] - 1))
-                        # check tile below
-                        if current[1] + 1 < self.grid_height:
-                            if not visited[current[0]][current[1] + 1]:
-                                stack.append((current[0], current[1] + 1))
-                    # add to score depending on size of the holes
-                    if size >= self.weights_cap:
-                        score -= self.hole_size_weights[-1]
-                    else:
-                        score -= self.hole_size_weights[size]
-
-        # remove this tetromino from the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                if tetromino.data.block_data[x][y]:
-                    grid_x = x + tetromino.x_pos
-                    grid_y = y + tetromino.y_pos
-                    # check if the tetromino cell is out of bounds
-                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                        continue
-                    # otherwise
-                    grid[grid_x][grid_y] = False
-        return score
-
     # finds the heights of the highest occupied cell in each column of a Tetris grid
     def compute_heightmap(self, grid):
         column_heights = []
@@ -319,6 +151,7 @@ class TetrisAI:
         return TetrisAI(ai.grid_width, ai.grid_height,
             new_row_filled_weights, new_hole_size_weights, new_column_diff_weights)
 
+    # randomly mutates weights given a mutation rate
     def mutate(self, mutate_rate):
         for i in range(self.grid_width):
             if random() <= mutate_rate:
@@ -330,7 +163,7 @@ class TetrisAI:
             if random() <= mutate_rate:
                 self.column_diff_weights[i] = self.random_weight()
 
-    # returns a copy of this AI; all its weights will be copied
+    # returns a deep copy of this AI
     def clone(self):
         return TetrisAI(
             self.grid_width, self.grid_height,
@@ -338,11 +171,13 @@ class TetrisAI:
             deepcopy(self.hole_size_weights),
             deepcopy(self.column_diff_weights))
 
-    # prints a Tetris grid with nice formatting
+    # prints a 2d list with nice formatting
     def print_grid(self, grid):
         print('-' * len(grid) * 2)
         for y in range(len(grid[0])):
-            print(('').join(['#' if grid[x][y] else '.' for x in range(self.grid_width)]))
+            print(('').join(['#' if grid[x][y] else '.' for x in range(len(grid))]))
 
     def random_weight(self):
-        return random()
+        # produce along the abs of a standard normal distribution curve using the Box-Muller transform
+        return abs(math.sqrt(-2 * math.log(random())) * math.cos(2 * math.pi * random()))
+        #return random() * 2 - 1

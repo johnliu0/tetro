@@ -18,7 +18,7 @@ class Tetro:
         self.mutate_rate = 0
         self.generation = 0
         # size of cell in pixels (for rendering)
-        self.cell_width = 35
+        self.cell_width = 5
         # active Tetris games and neural networks
         self.tetris_instances = []
         self.tetris_ais = []
@@ -27,6 +27,10 @@ class Tetro:
 
         self.load_properties()
         self.init_pygame()
+
+        # how long to sleep in ms per frame
+        self.sleep_times = [1, 5, 10, 25, 100, 300, 1000, 2000, 5000, 10000]
+        self.sleep_time_idx = 2
 
         self.tmino_manager = TetrominoManager.get_instance()
         self.tmino_manager.load_tetrominoes('data/shapes.txt', self.grid_width, self.grid_height)
@@ -74,14 +78,24 @@ class Tetro:
         self.generate_random_games(self.population_size)
         self.print_starting_generation()
         game_clock = pygame.time.Clock()
+        fps_timer, fps_counter = 0, 0
         while self.game_running:
             self.handle_input()
             if not self.game_paused:
                 self.update()
             self.render()
             self.update_gui_title()
-            pygame.time.wait(1)
-            print(game_clock.get_time())
+
+            # keep track of average FPS over the last 10 seconds
+            fps_counter += 1
+            fps_timer += game_clock.get_time()
+            if fps_timer >= 10000:
+                #print(f'Average FPS: {fps_counter / 5}')
+                fps_counter = 0
+                fps_timer -= 10000
+
+            # sleep so your CPU doesn't blow up!
+            pygame.time.wait(self.sleep_times[self.sleep_time_idx])
             game_clock.tick()
 
     def update(self):
@@ -111,22 +125,40 @@ class Tetro:
             self.pygame_surface, self.cell_width)
         pygame.display.flip()
 
+    # handles keyboard and window input
     def handle_input(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_j:
+                if event.key == pygame.K_j: # view previous game
                     self.current_spectating_idx -= 1
                     self.current_spectating_idx %= len(self.tetris_instances)
-                elif event.key == pygame.K_k:
+                elif event.key == pygame.K_k: # view next game
                     self.current_spectating_idx += 1
                     self.current_spectating_idx %= len(self.tetris_instances)
-                elif event.key == pygame.K_p:
+                elif event.key == pygame.K_p: # pause
                     self.game_paused = not self.game_paused
-                elif event.key == pygame.K_n:
-                    # generate new games
-                    pass
+                elif event.key == pygame.K_o: # view game with highest score
+                    highest_idx = -1
+                    highest_score = -1
+                    for i, inst in enumerate(self.tetris_instances):
+                        if not inst.lost and inst.lines_cleared > highest_score:
+                            highest_idx = i
+                            highest_score = inst.lines_cleared
+                    if highest_idx != -1:
+                        self.current_spectating_idx = i
+                        self.print_current_spectating_stats()
+                elif event.key == pygame.K_v: # view stats about current spectating game
+                    self.print_current_spectating_stats()
+                elif event.key == pygame.K_g: # increase sleep time
+                    self.sleep_time_idx += 1
+                    self.sleep_time_idx %= len(self.sleep_times)
+                    print(f'Changed sleep time to: {self.sleep_times[self.sleep_time_idx]}')
+                elif event.key == pygame.K_h: # decrease sleep time
+                    self.sleep_time_idx -= 1
+                    self.sleep_time_idx %= len(self.sleep_times)
+                    print(f'Changed sleep time to: {self.sleep_times[self.sleep_time_idx]}')
 
     def generate_random_games(self, num=1):
         self.tetris_instances.clear()
@@ -188,10 +220,26 @@ class Tetro:
         print()
         print(f'---- Starting Generation {self.generation} -----')
 
+    def print_current_spectating_stats(self):
+        print()
+        print(f'Currently spectatating game: {self.current_spectating_idx + 1}/{self.population_size}')
+        print(f'Lines cleared: {self.tetris_instances[self.current_spectating_idx].lines_cleared}')
+
     def format_float_list(self, float_list, num_decimals=2, delimiter=', ', brackets=False):
         s = delimiter.join([('{:.' + str(num_decimals) + 'f}').format(num) for num in float_list])
         return f'[{s}]' if brackets else s
 
-if __name__ == "__main__":
+# for color printing to console
+class Colors:
+    RED = '\033[1;31m'
+    BLUE = '\033[1;34m'
+    CYAN = '\033[1;36m'
+    GREEN = '\033[0;32m'
+    RESET = '\033[0;0m'
+    BOLD = '\033[;1m'
+    REVERSE = '\033[;7m'
+    ENDC = '\033[0m'
+
+if __name__ == '__main__':
     tetro = Tetro()
     tetro.start()
