@@ -39,51 +39,52 @@ class TetrisAI:
     # the type of Tetromino used is the Tetris instance current tetromino
     def compute_move(self, inst):
         tmino_id = inst.current_tmino.data.id
+        tmino_size = inst.current_tmino.data.size
         grid = inst.to_boolean_grid()
+        heights = self.compute_heightmap(grid)
+        best_move = [float('-inf'), None]
 
         start_time = perf_counter()
         compute_time = 0
 
-        # keep track of the best move that can be made
-        # a list in the format: (score, Tetromino)
-        best_move = [float('-inf'), None]
-        # try each rotation
         for rotation in range(4):
-            # initialize the rotated tetromino
-            tmino = Tetromino(inst.tmino_manager.get_tetromino_type(tmino_id, rotation))
-            # try each possible column
-            for x in range(tmino.data.min_x, tmino.data.max_x + 1):
-                tmino.x_pos = x
-                # find the lowest point that it can drop to
-                for y in range(tmino.data.min_y, tmino.data.max_y + 2):
-                    tmino.y_pos = y
-                    # if the tetromino is colliding, then the previous move
-                    # is the furthest it could have dropped
+            # to compute each possible drop placement, first find the largest value
+            # in the heightmap that contains the tetromino at each section of columns
+            tmino = Tetromino(inst.tmino_manager.get_tetromino_type(inst.current_tmino.data.id, rotation))
+            for i in range(tmino.data.min_x, tmino.data.max_x + 1):
+                tmino.x_pos = i
+                # find greatest height
+                greatest_height = 0
+                for j in range(i, i + tmino_size):
+                    # check for out of bounds
+                    if j >= 0 and j < self.grid_width:
+                        if heights[j] > greatest_height:
+                            greatest_height = heights[j]
+                # we are guaranteed that the tetromino will not have collided with
+                # anything before this greatest height value, all that is needed
+                # to do is find the correct point of contact now
+                for j in range(max(greatest_height - tmino_size, tmino.data.min_y), tmino.data.max_y + 1):
+                    tmino.y_pos = j
                     if inst.is_colliding(tmino):
-                        # however if the tetromino was colliding even at
-                        # its min y position, then it is not possible
-                        # to make a move in this column
-                        if tmino.y_pos == tmino.data.min_y:
-                            break
-                        tmino.y_pos -= 1
-
-                        # compute a score for this move using the neural network
-                        t = perf_counter()
-                        score = self.compute_score(grid, tmino)
-                        compute_time += perf_counter() - t
-
-
-                        if score > best_move[0]:
-                            best_move = [score, Tetromino(
-                                inst.tmino_manager.get_tetromino_type(tmino_id, rotation), tmino.x_pos, tmino.y_pos)]
-                        # once we have found a collision, move on to the next column
+                        tmino.y_pos = j - 1
                         break
+                if not inst.is_colliding(tmino):
+                    # tetromino is now at a possible placement
+                    t = perf_counter()
+                    score = self.compute_score(grid, tmino)
+                    compute_time += perf_counter() - t
+                    if score > best_move[0]:
+                        best_move = [score, Tetromino(
+                            inst.tmino_manager.get_tetromino_type(tmino_id, rotation), tmino.x_pos, tmino.y_pos)]
 
         total_time = perf_counter() - start_time
         #print()
         #print('total: ', total_time * 1000)
         #print('placement: ', (total_time - compute_time) * 1000)
         #print('compute: ', compute_time * 1000)
+        if best_move[1] == None:
+            print(heights)
+            self.print_grid(inst.grid)
 
         return best_move[1]
 
@@ -103,6 +104,45 @@ class TetrisAI:
                     grid[grid_x][grid_y] = True
 
         # add to score based on how filled the rows are
+        score = 0
+        for y in range(self.grid_height):
+            cells_filled = 0
+            for x in range(self.grid_width):
+                if grid[x][y]:
+                    cells_filled += 1
+            score += self.row_filled_weights[cells_filled]
+
+        # subtract from score based on heights of holes
+        heights = self.compute_heightmap(grid)
+        for x in range(self.grid_width):
+            hole_height = 0
+            for y in range(self.grid_height - heights[x], self.grid_height):
+                if grid[x][y]:
+                    if hole_height > 0:
+                        score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
+                        hole_height = 0
+                else:
+                    hole_height += 1
+            if hole_height > 0:
+                score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
+
+        # subtract from score based on differences in column heights
+        for i in range(1, len(heights)):
+            score -= self.column_diff_weights[heights[i] - heights[i - 1]]
+
+        # remove this tetromino from the binary grid
+        for x in range(tetromino.data.size):
+            for y in range(tetromino.data.size):
+                grid_x = x + tetromino.x_pos
+                grid_y = y + tetromino.y_pos
+                if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                    continue
+                if tetromino.data.block_data[x][y]:
+                    grid[grid_x][grid_y] = False
+
+        return score
+
+        """# add to score based on how filled the rows are
         score = 0
         for y in range(tetromino.y_pos, tetromino.y_pos + tetromino.data.size):
             if y < 0 or y >= self.grid_height:
@@ -147,7 +187,7 @@ class TetrisAI:
                 continue
             else:
                 score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
-                hole_height = 0
+                hole_height = 0"""
 
 
         # remove this tetromino from the binary grid
@@ -161,30 +201,6 @@ class TetrisAI:
                     grid[grid_x][grid_y] = False
 
         return score
-
-
-        """score = 0
-        for y in range(tetromino.y_pos, tetromino.y_pos + tetromino.data.size):
-            cells_filled = 0
-            for x in range(self.grid_width):
-                if y < 0 or y >= self.grid_height:
-                    break
-                if grid[x][y]:
-                    cells_filled += 1
-            score += self.row_filled_weights[cells_filled]
-
-        # remove this tetromino from the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                if tetromino.data.block_data[x][y]:
-                    grid_x = x + tetromino.x_pos
-                    grid_y = y + tetromino.y_pos
-                    # check if the tetromino cell is out of bounds
-                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
-                        continue
-                    # otherwise
-                    grid[grid_x][grid_y] = False"""
-        return 0
         # add the tetromino to the binary grid
         for x in range(tetromino.data.size):
             for y in range(tetromino.data.size):
@@ -275,6 +291,21 @@ class TetrisAI:
                     grid[grid_x][grid_y] = False
         return score
 
+    # finds the heights of the highest occupied cell in each column of a Tetris grid
+    def compute_heightmap(self, grid):
+        column_heights = []
+        for x in range(self.grid_width):
+            found = False
+            for y in range(self.grid_height):
+                if grid[x][y]:
+                    column_heights.append(self.grid_height - y)
+                    found = True
+                    break
+            if not found:
+                column_heights.append(0)
+        return column_heights
+
+
     # combines this AI and another by mixing weights
     # returns a new AI with crossovered weights
     def crossover(self, ai):
@@ -309,7 +340,7 @@ class TetrisAI:
 
     # prints a Tetris grid with nice formatting
     def print_grid(self, grid):
-        print('-' * len(grid))
+        print('-' * len(grid) * 2)
         for y in range(len(grid[0])):
             print(('').join(['#' if grid[x][y] else '.' for x in range(self.grid_width)]))
 

@@ -18,7 +18,7 @@ class Tetro:
         self.mutate_rate = 0
         self.generation = 0
         # size of cell in pixels (for rendering)
-        self.cell_width = 5
+        self.cell_width = 35
         # active Tetris games and neural networks
         self.tetris_instances = []
         self.tetris_ais = []
@@ -81,6 +81,7 @@ class Tetro:
             self.render()
             self.update_gui_title()
             pygame.time.wait(1)
+            print(game_clock.get_time())
             game_clock.tick()
 
     def update(self):
