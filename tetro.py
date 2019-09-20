@@ -83,7 +83,8 @@ class Tetro:
         while self.game_running:
             self.handle_input()
             if not self.game_paused:
-                self.update()
+                pass
+                #self.update()
             self.render()
             self.update_gui_title()
 
@@ -96,7 +97,7 @@ class Tetro:
                 fps_timer -= 10000
 
             # sleep so your CPU doesn't blow up!
-            pygame.time.wait(500)
+            pygame.time.wait(5000)
             game_clock.tick()
 
     def update(self):
@@ -168,7 +169,7 @@ class Tetro:
             self.tetris_instances.append(Game(self.grid_width, self.grid_height))
             self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], []))
 
-    def next_generation(self):
+    """def next_generation(self):
         self.generation += 1
         fitness_scores = [(inst.lines_cleared, i) for i, inst in enumerate(self.tetris_instances)]
         list.sort(fitness_scores, key=lambda elem: elem[0])
@@ -209,7 +210,7 @@ class Tetro:
         [self.tetris_instances.append(Game(self.grid_width, self.grid_height)) for i in range(self.population_size)]
         self.tetris_ais.clear()
         self.tetris_ais = new_ais
-        self.print_starting_generation()
+        self.print_starting_generation()"""
 
     def update_gui_title(self):
         pygame.display.set_caption(
@@ -230,7 +231,7 @@ class Tetro:
         s = delimiter.join([('{:.' + str(num_decimals) + 'f}').format(num) for num in float_list])
         return f'[{s}]' if brackets else s
 
-# for color printing to console
+"""# for color printing to console
 class Colors:
     RED = '\033[1;31m'
     BLUE = '\033[1;34m'
@@ -239,7 +240,7 @@ class Colors:
     RESET = '\033[0;0m'
     BOLD = '\033[;1m'
     REVERSE = '\033[;7m'
-    ENDC = '\033[0m'
+    ENDC = '\033[0m'"""
 
 if __name__ == '__main__':
     tetro = Tetro()

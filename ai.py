@@ -32,20 +32,17 @@ class TetrisAI:
         #self.hole_height_weights = [1.47, 1.78, 1.43, 2.03, 1.40]
         #self.column_diff_weights = [0.65, 0.67, 0.83, 0.88, 1.03]
 
-
-    # determine what move should be made given a Tetris instance
-    # the type of Tetromino used is the Tetris instance current tetromino
-    def compute_move(self, inst):
-        tmino_id = inst.current_tmino.data.id
-        tmino_size = inst.current_tmino.data.size
-        grid = inst.to_boolean_grid()
+    # computes all possible drop placements that can be made
+    def compute_moves_available(self, inst, grid, tetromino):
+        tmino_id = tetromino.data.id
+        tmino_size = tetromino.data.size
         heights = self.compute_heightmap(grid)
-        best_move = [float('-inf'), None]
-
+        possible_moves = []
+        # consider each rotation
         for rotation in inst.tmino_manager.unique_tmino_list[tmino_id - 1]:
             # to compute each possible drop placement, first find the largest value
             # in the heightmap that contains the tetromino at each section of columns
-            tmino = Tetromino(inst.tmino_manager.get_tetromino_type(inst.current_tmino.data.id, rotation))
+            tmino = Tetromino(tmino_manager.get_tetromino_type(tetromino.data.id, rotation))
             for i in range(tmino.data.min_x, tmino.data.max_x + 1):
                 tmino.x_pos = i
                 # find greatest height
@@ -65,25 +62,67 @@ class TetrisAI:
                         break
                 if not inst.is_colliding(tmino):
                     # tetromino is now at a possible placement
-                    score = self.compute_score(grid, tmino)
-                    if score > best_move[0]:
-                        best_move = [score, Tetromino(
-                            inst.tmino_manager.get_tetromino_type(tmino_id, rotation), tmino.x_pos, tmino.y_pos)]
-        return best_move[1]
+                    possible_moves.append((tmino.x_pos, tmino.y_pos, rotation))
+        return possible_moves
+
+    # determine what move should be made given a Tetris instance
+    # the type of Tetromino used is the Tetris instance current tetromino
+    def compute_move(self, inst):
+        best_move = ()
+        first_moves = self.compute_moves_available(inst, inst.current_tmino)
+        grid = inst.to_boolean_grid()
+        for move1 in first_moves:
+            tmino1 = Tetromino(inst.tmino_manager.get_tetromino_type(inst.current_tmino.data.id, move1[2]), move1[0], move1[1])
+            # add this first tetromino to the grid
+            for x in range(tmino1.data.size):
+                for y in range(tmino1.data.size):
+                    grid_x = x + tmino1.x_pos
+                    grid_y = y + tmino1.y_pos
+                    # check if the tmino1 cell is out of bounds
+                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                        continue
+                    # update the grid cell with the tmino1 cell
+                    if tmino1.data.block_data[x][y]:
+                        grid[grid_x][grid_y] = True
+            # compute possible moves for the next tetromino
+            second_moves = self.compute_moves_available(inst, inst.next_tmino)
+            for move2 in second_moves:
+                tmino2 = Tetromino(inst.tmino_manager.get_tetromino_type(inst.next_tmino.data.id, move2[2]), move2[0], move2[1])
+                score = compute_score(inst.grid, tmino)
+            # remove the first tetromino to the grid
+            for x in range(tmino2.data.size):
+                for y in range(tmino2.data.size):
+                    grid_x = x + tmino2.x_pos
+                    grid_y = y + tmino2.y_pos
+                    if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                        continue
+                    if tmino2.data.block_data[x][y]:
+                        grid[grid_x][grid_y] = False
+
+
+        return Tetromino(inst.tmino_manager.get_tetromino_type(inst.current_tmino.data.id, 0), 5, 5)
 
     # computes a score for the given binary grid arrangement and tetromino placement
     # True should indicate an occupied cell, False should indicate empty cell
-    def compute_score(self, grid, tetromino):
-        # add the tetromino to the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                grid_x = x + tetromino.x_pos
-                grid_y = y + tetromino.y_pos
-                # check if the tetromino cell is out of bounds
+    def compute_score(self, grid, tmino1, tmino2):
+        # add the tminos to the binary grid
+        for x in range(tmino1.data.size):
+            for y in range(tmino1.data.size):
+                grid_x = x + tmino1.x_pos
+                grid_y = y + tmino1.y_pos
+                # check if the tmino1 cell is out of bounds
                 if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
                     continue
-                # update the grid cell with the tetromino cell
-                if tetromino.data.block_data[x][y]:
+                # update the grid cell with the tmino1 cell
+                if tmino1.data.block_data[x][y]:
+                    grid[grid_x][grid_y] = True
+        for x in range(tmino2.data.size):
+            for y in range(tmino2.data.size):
+                grid_x = x + tmino2.x_pos
+                grid_y = y + tmino2.y_pos
+                if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                    continue
+                if tmino2.data.block_data[x][y]:
                     grid[grid_x][grid_y] = True
 
         # add to score based on how filled the rows are
@@ -113,16 +152,23 @@ class TetrisAI:
         for i in range(1, len(heights)):
             score -= self.column_diff_weights[min(abs(heights[i] - heights[i - 1]), self.column_diff_cap - 1)]
 
-        # remove this tetromino from the binary grid
-        for x in range(tetromino.data.size):
-            for y in range(tetromino.data.size):
-                grid_x = x + tetromino.x_pos
-                grid_y = y + tetromino.y_pos
+        # remove the tminos from the binary grid
+        for x in range(tmino1.data.size):
+            for y in range(tmino1.data.size):
+                grid_x = x + tmino1.x_pos
+                grid_y = y + tmino1.y_pos
                 if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
                     continue
-                if tetromino.data.block_data[x][y]:
+                if tmino1.data.block_data[x][y]:
                     grid[grid_x][grid_y] = False
-
+        for x in range(tmino2.data.size):
+            for y in range(tmino2.data.size):
+                grid_x = x + tmino2.x_pos
+                grid_y = y + tmino2.y_pos
+                if grid_x < 0 or grid_x >= self.grid_width or grid_y < 0 or grid_y >= self.grid_height:
+                    continue
+                if tmino2.data.block_data[x][y]:
+                    grid[grid_x][grid_y] = False
         return score
 
     # finds the heights of the highest occupied cell in each column of a Tetris grid

@@ -104,7 +104,7 @@ class TetrominoManager:
             if unique:
                 rotations.append(i)
         self.unique_tmino_list.append(rotations)
-    
+
     # determines if two tetrominos are rotationally unique
     def rotationally_unique(self, block_data1, block_data2):
         size = len(block_data1);
@@ -169,9 +169,9 @@ class TetrominoManager:
             print(''.join(['@' if block_data[x][y] else '.' for x in range(len(block_data))]))
 
     def get_tetromino_type(self, id, rotation=0):
-        return TetrominoManager.get_instance().tmino_list[((id - 1) * 4) + (rotation % 4)]
+        return self.tmino_list[((id - 1) * 4) + (rotation % 4)]
 
-# information a tetromino
+# preprocessed information a tetromino
 # provides details about rotation and min/max x/y positions
 class TetrominoType:
     def __init__(self, id, block_data, size, min_x, min_y, max_x, max_y, rotation, color):
@@ -187,11 +187,25 @@ class TetrominoType:
 
 # an instance of a tetromino
 class Tetromino:
-    def __init__(self, tetromino_type, x_pos=0, y_pos=0):
-        self.data = tetromino_type
+    def __init__(self, id, rotation=0, x_pos=0, y_pos=0):
+        # copy over data from the TetrominoType
+        self.set_type(id, rotation)
         self.x_pos = x_pos
         self.y_pos = y_pos
 
+    def set_type(id, rotation):
+        type = TetrominoManager.get_instance().get_tetromino_type(id, rotation)
+        self.size = type.size
+        self.min_x = type.min_x
+        self.min_y = type.min_y
+        self.max_x = type.max_x
+        self.max_y = type.max_y
+        self.color = type.color
+        self.id = id
+        self.rotation = rotation
+
     def rotate(self, clockwise=True):
-        self.data = TetrominoManager.get_instance().get_tetromino_type(
-            self.data.id, self.data.rotation + (1 if clockwise else -1))
+        self.set_type(self.id, self.rotation + (1 if clockwise else -1))
+
+    def set_rotation(self, rotation):
+        self.set_type(self.id, rotation)
