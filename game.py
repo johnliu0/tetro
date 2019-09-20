@@ -20,6 +20,7 @@ class Game:
 
         self.tmino_manager = TetrominoManager.get_instance()
         self.current_tmino = self.tmino_manager.random_tetromino()
+        self.next_tmino = self.tmino_manager.random_tetromino()
 
     # move current tetromino down one block
     def update(self):
@@ -32,7 +33,7 @@ class Game:
             self.current_tmino.y_pos -= 1
             self.place_tetromino()
 
-    def render(self, surface, cell_width):
+    def render(self, surface, font, cell_width):
         # draw grid
         for x in range(self.grid_width):
             for y in range(self.grid_height):
@@ -42,9 +43,14 @@ class Game:
                         surface,
                         self.tmino_manager.get_tetromino_color(self.grid[x][y]),
                         (x * cell_width, y * cell_width, cell_width - 1, cell_width - 1))
+        # draw a divider line
+        pygame.draw.rect(
+            surface,
+            (255, 255, 255),
+            (self.grid_width * cell_width, 0, 1, self.grid_height * cell_width))
 
-        # draw current tetromino
         if not self.lost:
+            # draw current tetromino
             block_data = self.current_tmino.data.block_data
             pos_x = self.current_tmino.x_pos
             pos_y = self.current_tmino.y_pos
@@ -56,6 +62,23 @@ class Game:
                             self.current_tmino.data.color,
                             ((x + pos_x) * cell_width, (y + pos_y) * cell_width,
                             cell_width - 1, cell_width - 1))
+            # draw next tetromino
+            text = font.render('Next piece: ', True, (255, 255, 255))
+            textRect = text.get_rect()
+            textRect.topleft = ((self.grid_width + 1) * cell_width, cell_width)
+            surface.blit(text, textRect)
+            block_data = self.next_tmino.data.block_data
+            pos_x = self.grid_width + 1
+            pos_y = 3
+            for x in range(len(block_data)):
+                for y in range(len(block_data[0])):
+                    if block_data[x][y]:
+                        pygame.draw.rect(
+                            surface,
+                            self.next_tmino.data.color,
+                            ((x + pos_x) * cell_width, (y + pos_y) * cell_width,
+                            cell_width - 1, cell_width - 1))
+
 
     # attempts to move the tetromino left
     def move_left(self):
@@ -180,7 +203,8 @@ class Game:
                 current_y -= 1
 
         # generate a new tetromino
-        self.current_tmino = self.tmino_manager.random_tetromino()
+        self.current_tmino = self.next_tmino
+        self.next_tmino = self.tmino_manager.random_tetromino()
 
         # determine if it is colliding with anything
         if self.is_colliding(self.current_tmino):

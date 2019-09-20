@@ -44,8 +44,9 @@ class Tetro:
     def init_pygame(self):
         pygame.init()
         self.pygame_surface = pygame.display.set_mode(
-            (self.grid_width * self.cell_width,
+            ((self.grid_width + 6) * self.cell_width,
             self.grid_height * self.cell_width))
+        self.pygame_font = pygame.font.Font(pygame.font.get_default_font(), 32)
 
     # loads game options from the properties file
     def load_properties(self):
@@ -95,7 +96,7 @@ class Tetro:
                 fps_timer -= 10000
 
             # sleep so your CPU doesn't blow up!
-            pygame.time.wait(1)
+            pygame.time.wait(500)
             game_clock.tick()
 
     def update(self):
@@ -122,7 +123,7 @@ class Tetro:
     def render(self):
         self.pygame_surface.fill((0, 0, 0))
         self.tetris_instances[self.current_spectating_idx].render(
-            self.pygame_surface, self.cell_width)
+            self.pygame_surface, self.pygame_font, self.cell_width)
         pygame.display.flip()
 
     # handles keyboard and window input
