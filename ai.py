@@ -6,29 +6,31 @@ from copy import deepcopy
 
 class TetrisAI:
     def __init__(self, grid_width, grid_height,
-        row_filled_weights=[], hole_size_weights=[], column_diff_weights=[]):
+        row_filled_weights=[], hole_height_weights=[], column_diff_weights=[]):
         self.grid_width = grid_width
         self.grid_height = grid_height
-        # maximum amount of weights for certain weight types
-        self.weights_cap = 10
         self.row_filled_weights = row_filled_weights
-        self.hole_size_weights = hole_size_weights
+        self.hole_height_weights = hole_height_weights
         self.column_diff_weights = column_diff_weights
+        # number of weights to use for hole height and column diff heuristics
+        # note that row filled weights uses grid_width + 1 weights
+        self.hole_height_cap = 5
+        self.column_diff_cap = 5
         # generate random weights if not provided
         if len(row_filled_weights) == 0:
             for i in range(grid_width + 1):
                 self.row_filled_weights.append(self.random_weight())
-        if len(hole_size_weights) == 0:
-            for i in range(self.weights_cap):
-                self.hole_size_weights.append(self.random_weight())
+        if len(hole_height_weights) == 0:
+            for i in range(self.hole_height_cap):
+                self.hole_height_weights.append(self.random_weight())
         if len(column_diff_weights) == 0:
-            for i in range(grid_height + 1):
+            for i in range(self.column_diff_cap):
                 self.column_diff_weights.append(self.random_weight())
 
         # test weights that perform ok
-        self.row_filled_weights = [1.97, 1.18, 0.32, 0.03, 0.30, 0.38, 0.52, 0.42, 0.17, 0.89, 1.83]
-        self.hole_size_weights = [2.05, 1.56, 2.46, 1.44, 0.92, 1.27, 1.04, 1.91, 0.08, 0.52]
-        self.column_diff_weights = [0.16, 0.19, 0.40, 0.42, 1.46, 0.73, 0.02, 0.58, 0.48, 0.62, 0.64, 0.43, 0.39, 0.23, 0.88, 0.28, 1.01, 0.26, 0.59, 0.48, 0.21]
+        #self.row_filled_weights = [2.12, 1.50, 1.04, 0.50, 0.10, 0.32, 0.18, 0.28, 0.18, 0.27, 1.24]
+        #self.hole_height_weights = [1.47, 1.78, 1.43, 2.03, 1.40]
+        #self.column_diff_weights = [0.65, 0.67, 0.83, 0.88, 1.03]
 
 
     # determine what move should be made given a Tetris instance
@@ -100,16 +102,16 @@ class TetrisAI:
             for y in range(self.grid_height - heights[x], self.grid_height):
                 if grid[x][y]:
                     if hole_height > 0:
-                        score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
+                        score -= self.hole_height_weights[min(hole_height, self.hole_height_cap) - 1]
                         hole_height = 0
                 else:
                     hole_height += 1
             if hole_height > 0:
-                score -= self.hole_size_weights[min(hole_height, len(self.hole_size_weights) - 1)]
+                score -= self.hole_height_weights[min(hole_height, self.hole_height_cap - 1)]
 
         # subtract from score based on differences in column heights
         for i in range(1, len(heights)):
-            score -= self.column_diff_weights[heights[i] - heights[i - 1]]
+            score -= self.column_diff_weights[min(abs(heights[i] - heights[i - 1]), self.column_diff_cap - 1)]
 
         # remove this tetromino from the binary grid
         for x in range(tetromino.data.size):
@@ -143,23 +145,23 @@ class TetrisAI:
     def crossover(self, ai):
         crossover_idx = randint(0, len(ai.row_filled_weights))
         new_row_filled_weights = deepcopy(self.row_filled_weights[:crossover_idx] + ai.row_filled_weights[crossover_idx:])
-        crossover_idx = randint(0, len(ai.hole_size_weights))
-        new_hole_size_weights = deepcopy(self.hole_size_weights[:crossover_idx] + ai.hole_size_weights[crossover_idx:])
+        crossover_idx = randint(0, len(ai.hole_height_weights))
+        new_hole_height_weights = deepcopy(self.hole_height_weights[:crossover_idx] + ai.hole_height_weights[crossover_idx:])
         crossover_idx = randint(0, len(ai.column_diff_weights))
         new_column_diff_weights = deepcopy(self.column_diff_weights[:crossover_idx] + ai.column_diff_weights[crossover_idx:])
 
         return TetrisAI(ai.grid_width, ai.grid_height,
-            new_row_filled_weights, new_hole_size_weights, new_column_diff_weights)
+            new_row_filled_weights, new_hole_height_weights, new_column_diff_weights)
 
     # randomly mutates weights given a mutation rate
     def mutate(self, mutate_rate):
         for i in range(self.grid_width):
             if random() <= mutate_rate:
                 self.row_filled_weights[i] = self.random_weight()
-        for i in range(self.weights_cap):
+        for i in range(self.hole_height_cap):
             if random() <= mutate_rate:
-                self.hole_size_weights[i] = self.random_weight()
-        for i in range(self.grid_height):
+                self.hole_height_weights[i] = self.random_weight()
+        for i in range(self.column_diff_cap):
             if random() <= mutate_rate:
                 self.column_diff_weights[i] = self.random_weight()
 
@@ -168,7 +170,7 @@ class TetrisAI:
         return TetrisAI(
             self.grid_width, self.grid_height,
             deepcopy(self.row_filled_weights),
-            deepcopy(self.hole_size_weights),
+            deepcopy(self.hole_height_weights),
             deepcopy(self.column_diff_weights))
 
     # prints a 2d list with nice formatting

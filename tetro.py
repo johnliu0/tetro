@@ -18,7 +18,7 @@ class Tetro:
         self.mutate_rate = 0
         self.generation = 0
         # size of cell in pixels (for rendering)
-        self.cell_width = 5
+        self.cell_width = 40
         # active Tetris games and neural networks
         self.tetris_instances = []
         self.tetris_ais = []
@@ -95,7 +95,7 @@ class Tetro:
                 fps_timer -= 10000
 
             # sleep so your CPU doesn't blow up!
-            pygame.time.wait(self.sleep_times[self.sleep_time_idx])
+            pygame.time.wait(1)
             game_clock.tick()
 
     def update(self):
@@ -182,7 +182,7 @@ class Tetro:
         print('Most lines cleared average: ', self.format_float_list([avg_most]))
 
         print('Most cleared row filled weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].row_filled_weights, brackets=True))
-        print('Most cleared hole size weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_size_weights, brackets=True))
+        print('Most cleared hole height weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_height_weights, brackets=True))
         print('Most cleared column diff weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].column_diff_weights, brackets=True))
 
         new_ais = []
