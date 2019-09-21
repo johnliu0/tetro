@@ -23,7 +23,7 @@ class TetrominoManager:
         # randomly choose a tetromino with no rotation
         tmino_type = self.tmino_list[idx * 4]
         # place it in the top middle of the grid
-        return Tetromino(tmino_type,
+        return Tetromino(idx + 1, 0,
             (tmino_type.max_x - tmino_type.min_x) // 2 + tmino_type.min_x, tmino_type.min_y)
 
     def get_tetromino_color(self, id):
@@ -193,8 +193,10 @@ class Tetromino:
         self.x_pos = x_pos
         self.y_pos = y_pos
 
-    def set_type(id, rotation):
+    def set_type(self, id, rotation):
         type = TetrominoManager.get_instance().get_tetromino_type(id, rotation)
+        self.unique_rotations_list = TetrominoManager.get_instance().unique_tmino_list[id - 1]
+        self.block_data = type.block_data
         self.size = type.size
         self.min_x = type.min_x
         self.min_y = type.min_y

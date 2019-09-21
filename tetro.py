@@ -3,7 +3,7 @@ import math
 import pygame
 from copy import deepcopy
 from random import random, randint
-from game import Game
+from tetris import Tetris
 from ai import TetrisAI
 from tetromino import TetrominoManager, Tetromino
 
@@ -80,11 +80,14 @@ class Tetro:
         self.print_starting_generation()
         game_clock = pygame.time.Clock()
         fps_timer, fps_counter = 0, 0
+
+        ai_clock = 0
+
         while self.game_running:
+            ai_clock += game_clock.get_time()
             self.handle_input()
             if not self.game_paused:
-                pass
-                #self.update()
+                self.update()
             self.render()
             self.update_gui_title()
 
@@ -92,12 +95,12 @@ class Tetro:
             fps_counter += 1
             fps_timer += game_clock.get_time()
             if fps_timer >= 10000:
-                #print(f'Average FPS: {fps_counter / 5}')
+                print(f'Average FPS: {fps_counter / 5}')
                 fps_counter = 0
                 fps_timer -= 10000
 
-            # sleep so your CPU doesn't blow up!
-            pygame.time.wait(5000)
+            # run as fact as you can!
+            pygame.time.wait(1)
             game_clock.tick()
 
     def update(self):
@@ -136,11 +139,14 @@ class Tetro:
                 if event.key == pygame.K_j: # view previous game
                     self.current_spectating_idx -= 1
                     self.current_spectating_idx %= len(self.tetris_instances)
+
                 elif event.key == pygame.K_k: # view next game
                     self.current_spectating_idx += 1
                     self.current_spectating_idx %= len(self.tetris_instances)
+
                 elif event.key == pygame.K_p: # pause
                     self.game_paused = not self.game_paused
+
                 elif event.key == pygame.K_o: # view game with highest score
                     highest_idx = -1
                     highest_score = -1
@@ -151,29 +157,49 @@ class Tetro:
                     if highest_idx != -1:
                         self.current_spectating_idx = i
                         self.print_current_spectating_stats()
+
                 elif event.key == pygame.K_v: # view stats about current spectating game
                     self.print_current_spectating_stats()
+
                 elif event.key == pygame.K_g: # increase sleep time
                     self.sleep_time_idx += 1
                     self.sleep_time_idx %= len(self.sleep_times)
                     print(f'Changed sleep time to: {self.sleep_times[self.sleep_time_idx]}')
+
                 elif event.key == pygame.K_h: # decrease sleep time
                     self.sleep_time_idx -= 1
                     self.sleep_time_idx %= len(self.sleep_times)
                     print(f'Changed sleep time to: {self.sleep_times[self.sleep_time_idx]}')
 
+                elif event.key == pygame.K_a: # move current tetromino to the left
+                    self.tetris_instances[self.current_spectating_idx].move_left()
+
+                elif event.key == pygame.K_d: # move current tetromino to the right
+                    self.tetris_instances[self.current_spectating_idx].move_right()
+
+                elif event.key == pygame.K_s: # move current tetromino down one block
+                    self.tetris_instances[self.current_spectating_idx].move_down()
+
+                elif event.key == pygame.K_w: # rotate current tetromino
+                    self.tetris_instances[self.current_spectating_idx].rotate()
+
+                elif event.key == pygame.K_SPACE: # drop current tetromino
+                    self.tetris_instances[self.current_spectating_idx].drop_down()
+
     def generate_random_games(self, num=1):
         self.tetris_instances.clear()
         self.tetris_ais.clear()
         for i in range(num):
-            self.tetris_instances.append(Game(self.grid_width, self.grid_height))
+            self.tetris_instances.append(Tetris(self.grid_width, self.grid_height))
             self.tetris_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], []))
 
-    """def next_generation(self):
+    def next_generation(self):
         self.generation += 1
+        # get fitness scores and sort
         fitness_scores = [(inst.lines_cleared, i) for i, inst in enumerate(self.tetris_instances)]
         list.sort(fitness_scores, key=lambda elem: elem[0])
         fitness_scores.reverse()
+
         avg_all = sum([elem[0] for elem in fitness_scores]) / len(fitness_scores)
         print('Lines cleared: ', self.format_float_list([elem[0] for elem in fitness_scores], num_decimals=0, delimiter=' '))
         print('Lines cleared average: ', self.format_float_list([avg_all]))
@@ -187,15 +213,17 @@ class Tetro:
         print('Most cleared hole height weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].hole_height_weights, brackets=True))
         print('Most cleared column diff weights: ', self.format_float_list(self.tetris_ais[highest_scores[0][1]].column_diff_weights, brackets=True))
 
+        # prepare next generation
         new_ais = []
-        if avg_most < 1 / self.selection_size:
+        # create completely new AIs if the average was too low
+        if avg_most <= 0.1:
             [new_ais.append(TetrisAI(self.grid_width, self.grid_height, [], [], [])) for i in range(self.population_size)]
         else:
             # produce new generation
-            # let half of the most fit of this generation continue on as is
+            # let the upper third of the most fit of this generation continue on as is
             for i in range(self.population_size // 2):
                 new_ais.append(self.tetris_ais[fitness_scores[i][1]].clone())
-            # then crossover the most fit until the population size is reached
+            # then crossover until the population size is reached
             while len(new_ais) != self.population_size:
                 # randomly select two different parents
                 idx1 = randint(0, len(highest_scores) - 1)
@@ -207,10 +235,10 @@ class Tetro:
                 new_ais[-1].mutate(self.mutate_rate)
 
         self.tetris_instances.clear()
-        [self.tetris_instances.append(Game(self.grid_width, self.grid_height)) for i in range(self.population_size)]
+        [self.tetris_instances.append(Tetris(self.grid_width, self.grid_height)) for i in range(self.population_size)]
         self.tetris_ais.clear()
         self.tetris_ais = new_ais
-        self.print_starting_generation()"""
+        self.print_starting_generation()
 
     def update_gui_title(self):
         pygame.display.set_caption(
@@ -230,6 +258,13 @@ class Tetro:
     def format_float_list(self, float_list, num_decimals=2, delimiter=', ', brackets=False):
         s = delimiter.join([('{:.' + str(num_decimals) + 'f}').format(num) for num in float_list])
         return f'[{s}]' if brackets else s
+
+# button for pygame window
+class Button:
+    def __init__(x_pos, y_pos, text):
+        self.x_pos = x_pos
+        self.y_pos = y_pos
+
 
 """# for color printing to console
 class Colors:
