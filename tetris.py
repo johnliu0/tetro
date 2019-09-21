@@ -5,12 +5,14 @@ from tetromino import TetrominoManager, Tetromino
 
 # an instance of the Tetris game
 class Tetris:
-    def __init__(self, grid_width, grid_height):
+    def __init__(self, grid_width, grid_height, cell_width):
         self.grid_width = grid_width
         self.grid_height = grid_height
+        self.cell_width = cell_width
         # whether or not the game has been lost yet
         self.lost = False
         self.lines_cleared = 0
+        self.font = pygame.font.Font(pygame.font.get_default_font(), 24)
 
         # the Tetris grid begins at the top-left corner
         # and can be indexed by grid[x][y]
@@ -30,17 +32,24 @@ class Tetris:
         self.next_tmino = self.tmino_seq[-1]
         self.tmino_seq.pop()
 
+        # keep track of the next move, used by the AI
+        self.next_move = None
+
     # move current tetromino down one block
     def update(self):
         if self.lost:
             return
+
+        if self.next_move != None:
+            self.current_tmino = self.next_move
+
         self.current_tmino.y_pos += 1
         # if tetromino is now colliding, then move it back and place it down
         if is_colliding(self.grid, self.current_tmino):
             self.current_tmino.y_pos -= 1
             self.place_tetromino()
 
-    def render(self, surface, font, cell_width):
+    def render(self, surface, next_move_outline):
         # draw grid
         for x in range(self.grid_width):
             for y in range(self.grid_height):
@@ -49,42 +58,68 @@ class Tetris:
                     pygame.draw.rect(
                         surface,
                         self.tmino_manager.get_tetromino_color(self.grid[x][y]),
-                        (x * cell_width, y * cell_width, cell_width - 1, cell_width - 1))
+                        (x * self.cell_width, y * self.cell_width, self.cell_width - 1, self.cell_width - 1))
         # draw a divider line
         pygame.draw.rect(
             surface,
             (255, 255, 255),
-            (self.grid_width * cell_width, 0, 1, self.grid_height * cell_width))
+            (self.grid_width * self.cell_width, 0, 1, self.grid_height * self.cell_width))
 
+        # draw current tetromino
         if not self.lost:
-            # draw current tetromino
             block_data = self.current_tmino.block_data
             pos_x = self.current_tmino.x_pos
             pos_y = self.current_tmino.y_pos
             for x in range(len(block_data)):
                 for y in range(len(block_data[0])):
-                    if block_data[x][y]:
+                    if self.current_tmino.block_data[x][y]:
                         pygame.draw.rect(
                             surface,
                             self.current_tmino.color,
-                            ((x + pos_x) * cell_width, (y + pos_y) * cell_width,
-                            cell_width - 1, cell_width - 1))
-            # draw next tetromino
-            text = font.render('Next piece: ', True, (255, 255, 255))
-            textRect = text.get_rect()
-            textRect.topleft = ((self.grid_width + 1) * cell_width, cell_width)
-            surface.blit(text, textRect)
-            block_data = self.next_tmino.block_data
-            pos_x = self.grid_width + 1
-            pos_y = 3
-            for x in range(len(block_data)):
-                for y in range(len(block_data[0])):
-                    if block_data[x][y]:
-                        pygame.draw.rect(
-                            surface,
-                            self.next_tmino.color,
-                            ((x + pos_x) * cell_width, (y + pos_y) * cell_width,
-                            cell_width - 1, cell_width - 1))
+                            ((x + pos_x) * self.cell_width, (y + pos_y) * self.cell_width,
+                            self.cell_width - 1, self.cell_width - 1))
+            # if specified, draw the next move outline
+            if next_move_outline:
+                if self.next_move != None:
+                    pos_x = self.next_move.x_pos
+                    pos_y = self.next_move.y_pos
+                    for x in range(len(block_data)):
+                        for y in range(len(block_data[0])):
+                            if self.next_move.block_data[x][y]:
+                                pygame.draw.rect(
+                                    surface,
+                                    self.next_move.color,
+                                    ((x + pos_x) * self.cell_width, (y + pos_y) * self.cell_width,
+                                    self.cell_width - 1, self.cell_width - 1), 2)
+
+        # draw next piece text
+        text_next, rect_next = self.render_text('Next piece:',
+            (self.grid_width + 1) * self.cell_width, self.cell_width * 1.5)
+        surface.blit(text_next, rect_next)
+
+        # render next tetromino under next piece next
+        block_data = self.next_tmino.block_data
+        pos_x = self.grid_width + 1
+        pos_y = 3.5
+        for x in range(len(block_data)):
+            for y in range(len(block_data[0])):
+                if block_data[x][y]:
+                    pygame.draw.rect(
+                        surface,
+                        self.next_tmino.color,
+                        ((x + pos_x) * self.cell_width, (y + pos_y) * self.cell_width,
+                        self.cell_width - 1, self.cell_width - 1))
+
+        # draw lines cleared text
+        text_cleared, rect_cleared = self.render_text('Lines cleared:',
+            (self.grid_width + 1) * self.cell_width, (self.tmino_manager.get_largest_tetromino_size() + 3) * self.cell_width)
+        surface.blit(text_cleared, rect_cleared)
+
+        # draw lines cleared number
+        text_lines, rect_lines = self.render_text(str(self.lines_cleared),
+            (self.grid_width + 1) * self.cell_width, (self.tmino_manager.get_largest_tetromino_size() + 4) * self.cell_width)
+        surface.blit(text_lines, rect_lines)
+
 
     # places the current tetromino down and generates a new one
     def place_tetromino(self):
@@ -175,6 +210,12 @@ class Tetris:
             tmino.y_pos = tmino.min_y
             seq.append(tmino)
         return seq
+
+    def render_text(self, text, top, left):
+        text_render = self.font.render(text, True, (255, 255, 255))
+        text_rect = text_render.get_rect()
+        text_rect.topleft = (top, left)
+        return (text_render, text_rect)
 
 # determines if a given boolean grid and a tetromino are colliding
 def is_colliding(grid, tetromino):

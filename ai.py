@@ -28,46 +28,49 @@ class TetrisAI:
             for i in range(self.column_diff_cap):
                 self.column_diff_weights.append(self.random_weight())
 
-        # test weights that perform ok
-        #self.row_filled_weights = [2.12, 1.50, 1.04, 0.50, 0.10, 0.32, 0.18, 0.28, 0.18, 0.27, 1.24]
-        #self.hole_height_weights = [1.47, 1.78, 1.43, 2.03, 1.40]
-        #self.column_diff_weights = [0.65, 0.67, 0.83, 0.88, 1.03]
+        # weights that have achieved 31228 line clears before (computer ran the whole night training this!)
+        # uncomment to try them out
+        #self.row_filled_weights = [1.80, 1.43, 0.92, 0.68, 0.49, 0.28, 0.11, 0.24, 0.16, 0.51, 1.07]
+        #self.hole_height_weights = [1.37, 1.84, 2.29, 2.15, 2.63]
+        #self.column_diff_weights = [0.32, 0.37, 0.39, 0.50, 0.74]
 
     # determine what move should be made given a Tetris instance
     # the type of Tetromino used is the Tetris instance current tetromino
     def compute_move(self, inst):
-        best_move = ()
+        best_move = (float('-inf'), None)
         grid = self.to_boolean_grid(inst.grid)
         # compute moves available with the current tetromino
         first_moves = self.compute_moves_available(grid, inst.current_tmino)
-        scores = []
         # for every move with the current tetromino,
         # compute moves available with the next tetromino
         for move1 in first_moves:
+            # determine a score for each move
             tmino1 = Tetromino(inst.current_tmino.id, move1[0], move1[1], move1[2])
             self.add_to_grid(grid, tmino1)
             score = self.compute_score(grid)
-            scores.append(score)
+            if score > best_move[0]:
+                best_move = (score, Tetromino(inst.current_tmino.id, move1[0], move1[1], move1[2]))
             self.remove_from_grid(grid, tmino1)
-            """highest_score = float('-inf')
-            # compute possible moves for the next tetromino
+
+            # the code below is an experimental scoring function
+            # it returns the average of the scores of the next tetromino placement
+            # note that this however runs exponentially slower then the code above
+            """# compute possible moves for the next tetromino
+            tmino1 = Tetromino(inst.current_tmino.id, move1[0], move1[1], move1[2])
+            self.add_to_grid(grid, tmino1)
+            sum_score = 0
             second_moves = self.compute_moves_available(grid, inst.next_tmino)
             for move2 in second_moves:
                 tmino2 = Tetromino(inst.next_tmino.id, move2[0], move2[1], move2[2])
                 self.add_to_grid(grid, tmino2)
-                score = self.compute_score(grid)
-                if score > highest_score:
-                    highest_score = score
+                sum_score += self.compute_score(grid)
                 self.remove_from_grid(grid, tmino2)
             self.remove_from_grid(grid, tmino1)
-            # use the average second move score as the score for a first move
-            scores.append(highest_score)"""
-        highest_idx = 0
-        for i in range(1, len(scores)):
-            if scores[i] > scores[highest_idx]:
-                highest_idx = i
-        best_move = first_moves[highest_idx]
-        return Tetromino(inst.current_tmino.id, best_move[0], best_move[1], best_move[2])
+
+            avg_score = float('-inf') if len(second_moves) == 0 else sum_score / len(second_moves)
+            if avg_score >= best_move[0]:
+                best_move = (avg_score, Tetromino(inst.current_tmino.id, move1[0], move1[1], move1[2]))"""
+        return best_move[1]
 
     # computes all possible drop placements that can be made
     def compute_moves_available(self, grid, tetromino):
@@ -77,12 +80,12 @@ class TetrisAI:
         for rotation in tetromino.unique_rotations_list:
             # to compute each possible drop placement, first find the largest value
             # in the heightmap that contains the tetromino at each section of columns
-            tmino = Tetromino(tetromino.id, rotation)
-            for i in range(tetromino.min_x, tetromino.max_x + 1):
-                tmino.x_pos = i
+            current_tmino = Tetromino(tetromino.id, rotation)
+            for i in range(current_tmino.min_x, current_tmino.max_x + 1):
+                current_tmino.x_pos = i
                 # find greatest height
                 greatest_height = 0
-                for j in range(i, i + tetromino.size):
+                for j in range(i, i + current_tmino.size):
                     # check for out of bounds
                     if j >= 0 and j < len(grid):
                         if heights[j] > greatest_height:
@@ -90,14 +93,14 @@ class TetrisAI:
                 # we are guaranteed that the tetromino will not have collided with
                 # anything before this greatest height value, all that is needed
                 # to do now is to find the correct point of contact
-                for j in range(max(len(grid[0]) - greatest_height - tetromino.size, tetromino.min_y), tetromino.max_y + 1):
-                    tmino.y_pos = j
-                    if is_colliding(grid, tmino):
-                        tmino.y_pos = j - 1
+                for j in range(max(len(grid[0]) - greatest_height - current_tmino.size, current_tmino.min_y), current_tmino.max_y + 1):
+                    current_tmino.y_pos = j
+                    if is_colliding(grid, current_tmino):
+                        current_tmino.y_pos = j - 1
                         break
-                if not is_colliding(grid, tmino):
+                if not is_colliding(grid, current_tmino):
                     # tetromino is now at a possible placement
-                    possible_moves.append((rotation, tmino.x_pos, tmino.y_pos))
+                    possible_moves.append((rotation, current_tmino.x_pos, current_tmino.y_pos))
         return possible_moves
 
     # computes a score for the given binary grid arrangement

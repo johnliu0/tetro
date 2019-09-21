@@ -163,6 +163,15 @@ class TetrominoManager:
             new_block_data.append([block_data[y][len(block_data) - x - 1] for y in range(len(block_data))])
         return new_block_data
 
+    # returns the tetromino with the largest size
+    def get_largest_tetromino_size(self):
+        largest_idx = 0
+        for i in range(1, self.unique_types):
+            if self.tmino_list[i * 4].size > self.tmino_list[largest_idx * 4].size:
+                largest_idx = i
+        return self.tmino_list[largest_idx * 4].size
+
+
     # prints block data to the console neatly
     def print_block_data(self, block_data):
         for y in range(len(block_data)):
