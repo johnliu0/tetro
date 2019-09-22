@@ -48,7 +48,7 @@ class Tetro:
             '\n\nHey, thanks for checking out Tetro.\n'
             'Press H while focused in the game to bring up available commands\n'
             'If you find any issues or bugs please report them on my GitHub repo at:\n'
-            'https//github.com/johnliu4/tetro.git. Thanks!\n'
+            'https://github.com/johnliu4/tetro.git. Thanks!\n'
             'Have fun with Tetro. :)\n')
         self.game_running = True
         self.game_loop()
