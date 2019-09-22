@@ -28,11 +28,11 @@ class TetrisAI:
             for i in range(self.column_diff_cap):
                 self.column_diff_weights.append(self.random_weight())
 
-        # weights that have achieved 31228 line clears before (computer ran the whole night training this!)
+        # weights that have achieved 57580 line clears before (computer ran for a whole day training this!)
         # uncomment to try them out
-        #self.row_filled_weights = [1.80, 1.43, 0.92, 0.68, 0.49, 0.28, 0.11, 0.24, 0.16, 0.51, 1.07]
-        #self.hole_height_weights = [1.37, 1.84, 2.29, 2.15, 2.63]
-        #self.column_diff_weights = [0.32, 0.37, 0.39, 0.50, 0.74]
+        #self.row_filled_weights = [0.69, 0.55, 0.41, 0.40, 0.31, 0.09, 0.01, 0.23, 0.34, 0.82, 1.48]
+        #self.hole_height_weights = [1.34, 1.90, 1.72, 2.08, 2.65]
+        #self.column_diff_weights = [0.12, 0.29, 0.38, 0.62, 0.86]
 
     # determine what move should be made given a Tetris instance
     # the type of Tetromino used is the Tetris instance current tetromino
