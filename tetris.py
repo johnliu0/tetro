@@ -153,6 +153,9 @@ class Tetris:
                 for y in range(current_y, 0, -1):
                     for x in range(self.grid_width):
                         self.grid[x][y] = self.grid[x][y - 1]
+                # clear upper most line
+                for x in range(self.grid_width):
+                    self.grid[x][0] = 0
             else:
                 # otherwise go to next line
                 current_y -= 1
