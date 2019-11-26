@@ -2,9 +2,15 @@
 
 ## Overview
 
-Tetris AI using a genetic algorithm. This library is written in Python and pygame (3.7.4 and 1.9.6 at the time of writing, respectively). No other libraries are needed. The machine learning logic is written in pure vanilla Python and does not require numpy or any math libraries.
+Tetris AI using a genetic algorithm. This library is written in Python and pygame (3.7.4 and 1.9.6 at the time of writing, respectively). No other libraries are needed. The machine learning logic is written in pure vanilla Python and does not require numpy or any other math libraries.
 
-After running this on my computer overnight, I discovered that one AI had cleared 31228 lines. I noted those weights in `ai.py` as comments.
+After letting this run on my computer for a few nights, I discovered that one AI was able to clear over 125,000 lines. This is highest score that I have seen a set of weights clear so far.
+
+## Get Started
+
+Run `python tetro.py`.
+
+Under `data/properties.txt`, you can change the parameters used for the genetic algorithm, including population size, selection size, and mutation rate.
 
 ## Sreenshot
 
@@ -30,4 +36,9 @@ The difference in heights of successive columns is exactly as described. Since w
 The game generates many instances of the genetic algorithm which control their own Tetris instance. At the end of each generation, when all Tetris instances have lost, the weights in the AIs are cross-overed and mutated to create a new generation of Tetris AIs.
 
 ## File structure
-The main file is in `tetro.py`. The AI logic is found under `ai.py`. The Tetris game implementation itself is in `tetris.py`. Tetromino data is stored in `tetromino.py`. Specifications for game properties and tetrominos can be found under `data/properties.txt` and `data/weights.txt`. The highest scoring AI of each generation will be recorded in `data/weights.txt`. There you can find the generation it belonged to, its weights, and how many lines it cleared.
+- `tetro.py`: Main file.
+- `ai.py`: AI logic.
+- `tetris.py`: Tetris game implementation.
+- `tetromino.py`: Tetromino logic.
+- `data/properties.txt`: Specifications for game properties.
+- `data/weights.txt`: Information about the highest scoring AI of each generation.

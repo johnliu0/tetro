@@ -1,7 +1,7 @@
 import math
 import pygame
 from random import randint
-from tetromino import TetrominoManager, Tetromino
+import tetromino
 
 # an instance of the Tetris game
 class Tetris:
@@ -21,7 +21,6 @@ class Tetris:
             col = [0] * self.grid_height
             self.grid.append(col)
 
-        self.tmino_manager = TetrominoManager.get_instance()
         # generate random sequence of tetrominos
         # the sequence will contain all types of tetrominos (excluding rotation)
         # when all the tetrominos in the sequence have been used, another
@@ -57,7 +56,7 @@ class Tetris:
                 if self.grid[x][y] != 0:
                     pygame.draw.rect(
                         surface,
-                        self.tmino_manager.get_tetromino_color(self.grid[x][y]),
+                        tetromino.get_tetromino_color(self.grid[x][y]),
                         (x * self.cell_width, y * self.cell_width, self.cell_width - 1, self.cell_width - 1))
         # draw a divider line
         pygame.draw.rect(
@@ -112,12 +111,12 @@ class Tetris:
 
         # draw lines cleared text
         text_cleared, rect_cleared = self.render_text('Lines cleared:',
-            (self.grid_width + 1) * self.cell_width, (self.tmino_manager.get_largest_tetromino_size() + 3) * self.cell_width)
+            (self.grid_width + 1) * self.cell_width, (tetromino.get_largest_tetromino_size() + 3) * self.cell_width)
         surface.blit(text_cleared, rect_cleared)
 
         # draw lines cleared number
         text_lines, rect_lines = self.render_text(str(self.lines_cleared),
-            (self.grid_width + 1) * self.cell_width, (self.tmino_manager.get_largest_tetromino_size() + 4) * self.cell_width)
+            (self.grid_width + 1) * self.cell_width, (tetromino.get_largest_tetromino_size() + 4) * self.cell_width)
         surface.blit(text_lines, rect_lines)
 
 
@@ -202,13 +201,13 @@ class Tetris:
 
     def generate_tetromino_seq(self):
         seq = []
-        id_list = [i for i in range(1, self.tmino_manager.unique_types + 1)]
+        id_list = [i for i in range(1, tetromino.unique_types + 1)]
         # randomly pull ids from the list and put it into the sequence
         while len(id_list) != 0:
             rand_idx = randint(0, len(id_list) - 1)
             id = id_list[rand_idx]
             id_list.pop(rand_idx)
-            tmino = Tetromino(id)
+            tmino = tetromino.Tetromino(id)
             tmino.x_pos = (tmino.max_x - tmino.min_x) // 2
             tmino.y_pos = tmino.min_y
             seq.append(tmino)
