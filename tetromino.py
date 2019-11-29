@@ -208,9 +208,8 @@ def get_largest_tetromino_size():
             largest_idx = i
     return tmino_list[largest_idx * 4].size
 
-
-# prints block data to the console neatly
 def print_block_data(block_data):
+    """Draws tetromino block data to the console."""
     for y in range(len(block_data)):
         print(''.join(['@' if block_data[x][y] else '.' for x in range(len(block_data))]))
 
@@ -229,6 +228,8 @@ class TetrominoType:
         self.color = color
 
 class Tetromino:
+    """An instance of a tetromino."""
+
     def __init__(self, id, rotation=0, x_pos=0, y_pos=0):
         self.set_type(id, rotation)
         self.x_pos = x_pos

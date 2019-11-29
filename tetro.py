@@ -26,7 +26,7 @@ class Tetro:
         self.generation = 0
 
         # size of cell in pixels (for rendering)
-        self.cell_width = 4
+        self.cell_width = 40
 
         # active Tetris games and neural networks
         self.tetris_instances = []
@@ -147,14 +147,7 @@ class Tetro:
             if inst.lost:
                 continue
             all_lost = False
-
-            # timer = time_ns()
             inst.next_move = ai.compute_move(inst)
-            # self.hello.append(time_ns() - timer)
-            # if len(self.hello) > 20:
-            #     self.hello.pop(0)
-            # if len(self.hello) == 20:
-            #     print(f'{sum(self.hello) / 20000000000}s')
 
         # start next generation if all Tetris instances have lost
         if all_lost:
